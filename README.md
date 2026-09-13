@@ -154,3 +154,8 @@ scripts/
   passaggio dalla spesa all'inventario.
 - **Gli importi sono interi in centesimi.** Niente float sui soldi.
 - **Le date sono stringhe `YYYY-MM-DD` in ora di Roma** (`src/lib/dates.ts`), non timestamp.
+- **`src/env.ts` va importato per primo** in `index.ts`. `src/db/index.ts` legge `DATABASE_PATH`
+  al momento dell'import, e in ESM gli import sono valutati prima del corpo del file: caricare
+  `.env` nel corpo di `index.ts` sarebbe troppo tardi. Le variabili già presenti nell'ambiente
+  vincono sul file, così `scripts/smoke.sh` può passarle sulla riga di comando senza che un
+  `.env` locale gliele sovrascriva.
