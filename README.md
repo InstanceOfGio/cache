@@ -127,10 +127,13 @@ periodico apposta: terrebbe la macchina sveglia ventiquattr'ore su ventiquattro.
 senza WAL. Fallo ogni tanto: ci mette un secondo.
 
 **Ripristino** — sempre da `/admin`, carichi il file. L'app lo verifica (deve essere SQLite e avere
-le tabelle giuste), lo mette da parte come `<db>.restore` e si riavvia: il file prende il posto del
-database al boot, quando nessuno lo sta usando. Il database precedente resta come `<db>.pre-restore`,
-quindi anche un ripristino sbagliato è recuperabile. Su Fly il riavvio è automatico; in locale rilanci
-tu il processo.
+le tabelle giuste), poi chiude la connessione, scambia i file e ne riapre una nuova: nessun riavvio
+del processo, quindi funziona identico in locale e su Fly.
+
+Il database precedente resta come `<db>.pre-restore` **insieme al suo `-wal`**, ed è questo il punto
+delicato: in modalità WAL il file principale può essere di 4 KB con mezzo megabyte di dati nel `-wal`,
+quindi mettere da parte solo il primo significherebbe salvare un guscio vuoto. Prima dello scambio
+(e prima di ogni backup) si fa un `wal_checkpoint(TRUNCATE)`, così il file principale è completo.
 
 **Export CSV** — inventario, spese e pasti, leggibili senza l'app.
 

@@ -4,7 +4,7 @@ import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Env } from '../app.js';
-import { db, dbPath, logActivity, setting } from '../db/index.js';
+import { checkpoint, db, dbPath, logActivity, replaceDatabase, setting } from '../db/index.js';
 import { hashPassword } from '../lib/auth.js';
 import { todayISO } from '../lib/dates.js';
 import { euros } from '../lib/money.js';
@@ -81,6 +81,7 @@ adminRoutes.post('/utenti/:id/elimina', (c) => {
 /* ---------------------------------------------------------------- backup */
 
 adminRoutes.get('/backup', (c) => {
+  checkpoint(); // in WAL il file principale puo essere quasi vuoto
   const tmp = join(tmpdir(), `cache-backup-${Date.now()}.sqlite`);
   db.prepare('vacuum into ?').run(tmp); // compattato: niente pagine libere, niente WAL
   const buf = readFileSync(tmp);
@@ -97,8 +98,9 @@ adminRoutes.get('/backup', (c) => {
 });
 
 /**
- * Il file arriva in `<db>.restore`: allo startup viene messo al posto del database.
- * Cosi non tocchiamo mai un file aperto a meta richiesta.
+ * Il file viene scritto di fianco, controllato, e solo allora sostituisce il database:
+ * `replaceDatabase` chiude la connessione, scambia i file e ne riapre una nuova.
+ * Niente riavvio del processo, cosi funziona identico in locale e su Fly.
  */
 adminRoutes.post('/ripristina', async (c) => {
   const form = await c.req.formData();
@@ -111,35 +113,42 @@ adminRoutes.post('/ripristina', async (c) => {
     return page(c, { error: 'Non sembra un database SQLite.' });
   }
 
-  const staged = `${dbPath}.restore`;
-  writeFileSync(staged, buf);
+  const incoming = `${dbPath}.incoming`;
+  writeFileSync(incoming, buf);
 
   // verifica che sia davvero un backup di Cache prima di accettarlo
+  let righe = 0;
   try {
     const Database = (await import('better-sqlite3')).default;
-    const probe = new Database(staged, { readonly: true });
+    const probe = new Database(incoming, { readonly: true });
     const tables = probe.prepare("select name from sqlite_master where type='table'").all() as { name: string }[];
-    probe.close();
     const names = new Set(tables.map((t) => t.name));
     for (const required of ['users', 'products', 'inventory', 'schema_migrations']) {
       if (!names.has(required)) throw new Error(`manca la tabella ${required}`);
     }
+    righe = (probe.prepare('select count(*) as n from inventory').get() as { n: number }).n;
+    probe.close();
   } catch (e) {
-    unlinkSync(staged);
+    unlinkSync(incoming);
     return page(c, { error: `Backup non valido: ${(e as Error).message}` });
   }
 
+  // prima dello scambio: dopo, questo utente potrebbe non esistere piu
   logActivity(c.get('user').id, 'admin.restore', `${Math.round(buf.byteLength / 1024)} KB`);
-  setTimeout(() => process.exit(0), 300); // riparte e trova il file pronto
+  replaceDatabase(incoming);
+
+  // la sessione vive nel database appena sostituito: se il backup e vecchio,
+  // il cookie non vale piu e la prossima pagina rimanda al login
   return c.html(
-    <Shell title="Ripristino" user={c.get('user')} bare>
+    <Shell title="Ripristino" bare>
       <div class="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 text-center">
-        <div class="font-display text-title">Ripristino in corso</div>
+        <div class="font-display text-title">Ripristino fatto</div>
         <p class="font-body text-ink-60 dark:text-dark-muted">
-          L'app si riavvia con i dati del backup. Aspetta qualche secondo e ricarica.
+          {righe} {righe === 1 ? 'articolo' : 'articoli'} in inventario. Il database precedente resta
+          come <code>.pre-restore</code> accanto a quello nuovo.
         </p>
-        <a href="/" class="btn-secondary mt-2">
-          Ricarica
+        <a href="/" class="btn-cta mt-2 w-auto px-6">
+          Vai all'inventario
         </a>
       </div>
     </Shell>,

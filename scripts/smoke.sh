@@ -102,6 +102,27 @@ BK=$(curl -s -b "$J" "$BASE/admin/backup" | head -c 16)
 contains "il backup e un file SQLite" "SQLite format 3" "$BK"
 check "export CSV" 200 "$(CODE "$BASE/admin/export.csv")"
 
+# --- ripristino ----------------------------------------------------------
+# Il giro completo: scarico, sporco, ripristino, controllo che sia tornato indietro.
+BK_FILE=$(mktemp); curl -s -b "$J" -o "$BK_FILE" "$BASE/admin/backup"
+PRIMA=$(G "$BASE/" | grep -o 'id="inv-[0-9]*"' | wc -l)
+G -X POST "$BASE/spesa" -d 'name=Articolo da cancellare col ripristino' > /dev/null
+contains "prima del ripristino la riga c'e" "Articolo da cancellare" "$(G "$BASE/spesa")"
+
+RIP=$(G -X POST "$BASE/admin/ripristina" -F "file=@$BK_FILE")
+contains "il ripristino conferma" "Ripristino fatto" "$RIP"
+contains "il ripristino dice quanti articoli" "in inventario" "$RIP"
+
+DOPO=$(G "$BASE/" | grep -o 'id="inv-[0-9]*"' | wc -l)
+check "l'inventario e tornato com'era" "$PRIMA" "$DOPO"
+if printf '%s' "$(G "$BASE/spesa")" | grep -qF "Articolo da cancellare"; then
+  say "il ripristino ha annullato la modifica" "FALLITO"; ko=$((ko+1))
+else say "il ripristino ha annullato la modifica" "ok"; ok=$((ok+1)); fi
+check "l'app risponde ancora dopo il ripristino" 200 "$(CODE "$BASE/")"
+check "la sessione sopravvive al ripristino"     200 "$(CODE "$BASE/admin")"
+check "un file che non e un database viene rifiutato" 200 "$(CODE -X POST "$BASE/admin/ripristina" -F "file=@$0")"
+contains "e lo dice" "Non sembra un database SQLite" "$(G -X POST "$BASE/admin/ripristina" -F "file=@$0")"
+
 # --- frammenti htmx ------------------------------------------------------
 # Ogni pezzo di UI caricato via htmx: se uno va in 500 l'interfaccia si rompe
 # in silenzio, perche htmx non sostituisce niente e non c'e errore a schermo.
