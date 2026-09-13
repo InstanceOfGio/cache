@@ -4,7 +4,7 @@
 # istanza: due macchine significherebbero due database che divergono in silenzio.
 #   fly scale count 1
 
-app = "cache"
+app = "cache-fw"
 primary_region = "fra"
 
 [build]
