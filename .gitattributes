@@ -1,0 +1,8 @@
+# Fine riga LF ovunque: uno script di shell con CRLF non parte sotto bash,
+# e il progetto gira su Windows in locale e su Linux in CI e in produzione.
+* text=auto eol=lf
+
+*.png  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary

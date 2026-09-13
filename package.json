@@ -1,0 +1,41 @@
+{
+  "name": "cache",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "node scripts/vendor.mjs",
+    "dev": "concurrently -k -n css,srv -c magenta,green \"npm:dev:css\" \"npm:dev:srv\"",
+    "dev:css": "tailwindcss -i src/styles.css -o static/app.css --watch",
+    "dev:srv": "tsx watch src/index.ts",
+    "build": "npm run build:css && npm run build:js && npm run build:vendor",
+    "build:css": "tailwindcss -i src/styles.css -o static/app.css --minify",
+    "build:js": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/server.js --external:better-sqlite3 --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "build:vendor": "node scripts/vendor.mjs",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "better-sqlite3": "^12.2.0",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.0",
+    "esbuild": "^0.24.2",
+    "htmx.org": "^2.0.4",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.24.2": true,
+    "esbuild@0.28.2": true
+  }
+}

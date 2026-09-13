@@ -1,0 +1,43 @@
+name: Verifica e deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verifica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Giro completo sull'app avviata
+        run: |
+          DATABASE_PATH=./data/ci.sqlite PORT=3111 \
+          ADMIN_EMAIL=ci@example.com ADMIN_PASSWORD=password-di-prova ADMIN_NAME=CI \
+          node dist/server.js &
+          for i in $(seq 1 30); do curl -sf http://localhost:3111/health && break; sleep 1; done
+          BASE=http://localhost:3111 ADMIN_PASSWORD=password-di-prova \
+          ADMIN_EMAIL=ci@example.com bash scripts/smoke.sh
+
+  deploy:
+    needs: verifica
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+data/
+*.sqlite
+*.sqlite-*
+.env
+
+# generati da scripts/vendor.mjs e da tailwind (npm run build, o postinstall)
+static/app.css
+static/htmx.min.js
+static/manifest.webmanifest
+static/icons/
+
+# IntelliJ
+.idea/
+out/
+*.iml

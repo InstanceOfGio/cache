@@ -1,0 +1,39 @@
+# Cache — una sola macchina, un solo volume.
+#
+# ATTENZIONE: non scalare oltre una macchina. Il volume e attaccato a una sola
+# istanza: due macchine significherebbero due database che divergono in silenzio.
+#   fly scale count 1
+
+app = "cache"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PORT = "8080"
+  DATABASE_PATH = "/data/cache.sqlite"
+  TZ = "Europe/Rome"
+
+[[mounts]]
+  source = "cache_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"   # si sospende quando non la usate, riparte in ~1s
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 25
+    hard_limit = 60
+
+# Niente health check periodico: terrebbe la macchina sveglia 24/7 e fa saltare
+# il risparmio dell'auto-suspend. /health resta disponibile per controlli manuali.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

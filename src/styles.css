@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: theme('colors.paper.DEFAULT');
+  }
+  html.dark {
+    background: theme('colors.dark.bg');
+  }
+  body {
+    @apply bg-paper text-ink font-body antialiased dark:bg-dark-bg dark:text-dark-text;
+    overscroll-behavior-y: none;
+  }
+  /* i campi non devono far zoomare iOS: mai sotto i 16px */
+  input,
+  textarea,
+  select,
+  button {
+    font-size: inherit;
+    font-family: inherit;
+  }
+  input,
+  textarea {
+    @apply text-[17px];
+  }
+  /* niente evidenziazione blu al tap */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* ---------------------------------------------------------------- righe */
+  .row {
+    @apply flex h-row items-center gap-1.5 border-b border-dashed border-ink-18 pl-4 pr-2 dark:border-dark-line;
+  }
+  .row-name {
+    @apply truncate font-body text-row;
+  }
+  .band {
+    @apply flex h-band items-center justify-between bg-paper-band px-4 font-display text-label uppercase text-olive dark:bg-dark-band dark:text-olive-light;
+  }
+
+  /* -------------------------------------------------------------- bottoni */
+  .btn-step {
+    @apply grid h-tap w-tap flex-none place-items-center rounded-md border-1.5 border-ink-28 font-display text-2xl font-medium
+           text-ink active:opacity-60 dark:border-dark-line30 dark:text-dark-text;
+  }
+  .btn-step-plus {
+    @apply border-olive bg-olive text-paper dark:border-olive-light dark:bg-olive-light dark:text-dark-bg;
+  }
+  .btn-cta {
+    @apply flex h-cta w-full items-center justify-center gap-2.5 rounded-lg bg-olive font-display text-[19px] font-bold
+           text-paper active:opacity-80 disabled:opacity-40 dark:bg-olive-light dark:text-dark-bg;
+  }
+  .btn-secondary {
+    @apply flex h-tap items-center justify-center rounded-md border-1.5 border-ink px-4 font-display text-[15px] font-semibold
+           text-ink active:opacity-60 dark:border-dark-line30 dark:text-dark-text;
+  }
+  .btn-quiet {
+    @apply flex h-tap items-center justify-center rounded-md border-1.5 border-ink-28 px-3 font-display text-[15px]
+           font-semibold text-ink active:opacity-60 dark:border-dark-line30 dark:text-dark-text;
+  }
+  .btn-text {
+    @apply h-tap px-3 font-display text-[15px] font-semibold text-olive underline underline-offset-[3px] dark:text-olive-light;
+  }
+  .btn-danger {
+    @apply flex h-tap items-center justify-center rounded-md border-1.5 border-mattone px-4 font-display text-[15px]
+           font-semibold text-mattone active:opacity-60;
+  }
+
+  /* --------------------------------------------------------------- campi */
+  .field {
+    @apply h-[52px] w-full rounded-md border-1.5 border-ink-28 bg-paper-field px-3.5 font-body text-row text-ink
+           outline-none placeholder:text-ink-50 focus:border-olive
+           dark:border-dark-line30 dark:bg-dark-field dark:text-dark-text dark:placeholder:text-dark-muted dark:focus:border-olive-light;
+  }
+  .label {
+    @apply font-display text-label uppercase text-olive dark:text-olive-light;
+  }
+
+  /* --------------------------------------------------------------- badge */
+  .badge {
+    @apply flex-none whitespace-nowrap rounded px-1.5 py-[3px] font-display text-badge uppercase;
+  }
+  .badge-threshold {
+    @apply bg-senape-tint text-senape-ink dark:bg-dark-senapeBg dark:text-dark-senape;
+  }
+  .badge-expiring {
+    @apply bg-terra-tint text-terra-ink dark:bg-dark-terraBg dark:text-dark-terra;
+  }
+  .badge-expired {
+    @apply bg-mattone text-paper;
+  }
+  .badge-olive {
+    @apply bg-olive-tint text-olive-deep dark:bg-olive-deep dark:text-olive-tint;
+  }
+  .badge-auto {
+    @apply border border-dashed border-senape text-senape-ink dark:text-dark-senape;
+  }
+
+  .tab {
+    @apply px-4 py-3 font-display text-base font-semibold text-ink-50 dark:text-dark-muted;
+  }
+  .tab-on {
+    @apply -mb-[1.5px] border-b-3 border-olive font-bold text-ink dark:border-olive-light dark:text-dark-text;
+  }
+
+  /* Barra dell'azione principale. `sticky bottom-0` si ancorerebbe al fondo del
+     viewport, cioe SOTTO la navigazione fissa: va alzata di tutta la sua altezza. */
+  .cta-bar {
+    @apply sticky bottom-[calc(theme(spacing.nav)+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t
+           from-paper from-30% px-4 pb-2 pt-2.5 lg:bottom-0 lg:px-0 dark:from-dark-bg;
+  }
+
+  .sheet {
+    @apply rounded-t-sheet bg-paper px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 dark:bg-dark-bg;
+  }
+  .grab {
+    @apply mx-auto h-1 w-10 rounded bg-ink-28 dark:bg-dark-line30;
+  }
+}
+
+/* Definite qui e non solo nel tema: Tailwind emette i @keyframes del tema
+   soltanto quando una utility animate-* li usa, e queste le richiamiamo a mano. */
+@keyframes flash {
+  0%,
+  12% {
+    background: theme('colors.olive.DEFAULT');
+    color: theme('colors.paper.DEFAULT');
+  }
+  26%,
+  100% {
+    background: transparent;
+    color: inherit;
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+@keyframes bar {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 70%;
+  }
+}
+
+/* --------------------------------------------------------------- HTMX */
+
+/* barra di avanzamento in cima, mai spinner al centro */
+#progress {
+  position: fixed;
+  inset: 0 auto auto 0;
+  height: 3px;
+  width: 0;
+  background: theme('colors.olive.DEFAULT');
+  z-index: 60;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+html.dark #progress {
+  background: theme('colors.olive.light');
+}
+body.htmx-request #progress {
+  opacity: 1;
+  animation: bar 1.2s ease-out infinite;
+}
+
+/* il bottone premuto resta "abbassato" */
+.htmx-request.btn-step,
+.htmx-request.btn-cta,
+button.htmx-request {
+  opacity: 0.6;
+}
+
+/* feedback dopo +1: il numero lampeggia oliva */
+.qty.flash,
+.htmx-settling .qty {
+  animation: flash 0.55s ease-out 1;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e6dfd0 0, #efe9dd 40px, #e6dfd0 80px);
+  background-size: 200px 100%;
+  animation: shimmer 1.1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
