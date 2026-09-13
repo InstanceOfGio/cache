@@ -130,6 +130,7 @@ privacy vera servirebbe cifratura lato client, che è un'altra storia.
 ```
 src/
   app.ts              middleware (CSRF, sessione) e montaggio delle rotte
+  env.ts              carica .env; va importato per primo
   index.ts            avvio, primo admin, chiusura pulita
   db/
     index.ts          connessione, pragma, migrazioni, ripristino al boot

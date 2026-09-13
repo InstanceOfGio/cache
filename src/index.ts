@@ -1,3 +1,4 @@
+import './env.js'; // per primo: carica .env prima che i moduli sotto leggano process.env
 import { serve } from '@hono/node-server';
 import { app } from './app.js';
 import { db } from './db/index.js';
