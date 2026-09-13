@@ -222,7 +222,7 @@ export function applyActions(actions: Action[], userId: number): number {
     let n = 0;
     for (const a of actions) {
       if (a.kind === 'inv') {
-        const product = a.productId ? { id: a.productId } : findOrCreateProduct(a.name, a.size, a.location);
+        const product = a.productId ? { id: a.productId } : findOrCreateProduct(a.name, { size: a.size, location: a.location });
         const existing = db
           .prepare('select id from inventory where product_id = ? and location = ?')
           .get(product.id, a.location) as { id: number } | undefined;

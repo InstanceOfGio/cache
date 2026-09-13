@@ -54,8 +54,18 @@ export function findProduct(name: string, size?: string | null): Product | null 
   );
 }
 
-/** Trova il prodotto o lo crea nel catalogo. */
-export function findOrCreateProduct(name: string, size?: string | null, location?: string): Product {
+/**
+ * Trova il prodotto o lo crea nel catalogo.
+ *
+ * Le opzioni sono un oggetto di proposito: `size` e `location` sono entrambe
+ * stringhe, e passandole per posizione e gia successo di scambiarle senza che
+ * il compilatore dicesse niente.
+ */
+export function findOrCreateProduct(
+  name: string,
+  opts: { size?: string | null; location?: string } = {},
+): Product {
+  const { size = null, location } = opts;
   const existing = findProduct(name, size);
   if (existing) return existing;
   const clean = titleCase(name);

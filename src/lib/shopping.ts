@@ -52,7 +52,7 @@ export function add(
 ): ShoppingRow | null {
   const name = rawName.trim();
   if (!name) return null;
-  const product = findOrCreateProduct(name, size);
+  const product = findOrCreateProduct(name, { size });
   const existing = db
     .prepare('select id, qty from shopping_items where product_id = ? and loaded_at is null and checked_at is null')
     .get(product.id) as { id: number; qty: number } | undefined;

@@ -2,6 +2,7 @@ import type { FC } from 'hono/jsx';
 import { badgeFor, type Filter } from '../lib/inventory.js';
 import { qtyLabel } from '../lib/money.js';
 import type { Suggestion } from '../lib/products.js';
+import { parseLine } from '../lib/parse.js';
 import { LOCATIONS, type InventoryRow } from '../lib/types.js';
 import { Overlay } from './sheet.js';
 
@@ -299,8 +300,24 @@ export const AddSheet: FC<SheetProps> = ({ q, suggestions, location, qty, justAd
 
 export const Suggestions: FC<{ q: string; suggestions: Suggestion[] }> = ({ q, suggestions }) => {
   const term = q.trim();
+  const parsed = term ? parseLine(term) : null;
+  // mostriamo cosa ha capito l'app solo quando ha capito qualcosa in piu del nome
+  const interpreted = parsed && (parsed.size || parsed.qty > 1 || parsed.expiresOn) ? parsed : null;
   return (
     <>
+      {interpreted ? (
+        <div class="flex items-center gap-2 border-b border-dashed border-ink-18 py-2 font-body text-sm text-ink-60 dark:border-dark-line dark:text-dark-muted">
+          <span class="label">Leggo</span>
+          <span class="truncate text-ink dark:text-dark-text">
+            {interpreted.name}
+            {interpreted.size ? <span class="text-ink-60 dark:text-dark-muted"> · {interpreted.size}</span> : null}
+            {interpreted.qty > 1 ? <span class="font-display font-semibold"> ×{interpreted.qty}</span> : null}
+            {interpreted.expiresOn ? (
+              <span class="text-ink-60 dark:text-dark-muted"> · scade {interpreted.expiresOn}</span>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
       {suggestions.map((s) => (
         <button
           type="button"
@@ -320,12 +337,13 @@ export const Suggestions: FC<{ q: string; suggestions: Suggestion[] }> = ({ q, s
           </span>
         </button>
       ))}
-      {term && !suggestions.some((s) => s.name.toLowerCase() === term.toLowerCase()) ? (
+      {interpreted || (term && !suggestions.some((s) => s.name.toLowerCase() === term.toLowerCase())) ? (
         <button
           type="submit"
           class="flex h-row items-center gap-2 font-body text-row text-olive dark:text-olive-light"
         >
-          <span class="font-display text-[22px] font-semibold">+</span> Crea “{term}” come nuovo articolo
+          <span class="font-display text-[22px] font-semibold">+</span> Crea “{parsed?.name ?? term}
+          {parsed?.size ? ` ${parsed.size}` : ''}” come nuovo articolo
         </button>
       ) : null}
     </>

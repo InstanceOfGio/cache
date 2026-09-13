@@ -111,6 +111,19 @@ contains "autocomplete: prefisso evidenziato" ">Pass</b>" "$SUG"
 contains "autocomplete: posizione e giacenza" "ne hai" "$SUG"
 check "autocomplete a mani vuote"  200 "$(CODE "$BASE/inventario/nuovo/suggerimenti?q=")"
 check "foglio aggiungi"            200 "$(CODE "$BASE/inventario/nuovo")"
+
+# dal foglio si scrive tutto di getto: nome, formato e quantita in un campo solo
+ADDED=$(G -X POST "$BASE/inventario/aggiungi" -d 'q=Ceci 230 gr x4' -d 'qty=1' -d 'location=Dispensa')
+contains "aggiunta: nome e formato separati" "Aggiunto: Ceci 230 g" "$ADDED"
+INVX=$(G "$BASE/")
+contains "in lista compare il formato" "230 g" "$INVX"
+# il formato e la posizione sono entrambi stringhe: gia scambiati una volta
+if printf '%s' "$INVX" | grep -qE 'Ceci</span>[^<]*<span[^>]*>(Dispensa|Frigo)'; then
+  say "il formato non e la posizione" "FALLITO"; ko=$((ko+1))
+else say "il formato non e la posizione" "ok"; ok=$((ok+1)); fi
+contains "la quantita scritta a mano vince" ">4<" "$INVX"
+QLEGGE=$(G "$BASE/inventario/nuovo/suggerimenti?q=Riso%20500%20gr%20x2")
+contains "il foglio dice cosa ha letto" "Leggo" "$QLEGGE"
 check "foglio dettagli"            200 "$(CODE "$BASE/inventario/$ID/dettagli")"
 check "foglio copia per LLM"       200 "$(CODE "$BASE/llm/copia")"
 check "foglio nuova spesa"         200 "$(CODE "$BASE/spese/nuova?scope=common")"

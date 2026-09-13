@@ -12,7 +12,8 @@ import {
   updateDetails,
   type Filter,
 } from '../lib/inventory.js';
-import { findOrCreateProduct, suggestProducts, validLocation } from '../lib/products.js';
+import { parseLine } from '../lib/parse.js';
+import { findOrCreateProduct, productLabel, suggestProducts, validLocation } from '../lib/products.js';
 import { isValidISODate } from '../lib/dates.js';
 import { Shell } from '../views/layout.js';
 import { AddSheet, DetailSheet, InventoryPage, List, Row, Suggestions } from '../views/inventory.js';
@@ -66,18 +67,25 @@ inventoryRoutes.get('/inventario/nuovo/suggerimenti', (c) => {
 inventoryRoutes.post('/inventario/aggiungi', async (c) => {
   const user = c.get('user');
   const form = await c.req.formData();
-  const name = String(form.get('q') ?? '').trim();
+  const typed = String(form.get('q') ?? '').trim();
   const productId = Number(form.get('product_id') ?? 0) || null;
-  const qty = Math.max(0.01, Number(form.get('qty') ?? 1) || 1);
+  const stepper = Math.max(0.01, Number(form.get('qty') ?? 1) || 1);
   const location = validLocation(String(form.get('location') ?? ''));
 
-  if (!productId && !name) {
-    return c.html(<AddSheet q="" suggestions={[]} location={location} qty={qty} />);
+  // il campo accetta tutto di getto: "Ceci 230 gr x4"
+  const parsed = typed ? parseLine(typed) : null;
+  // una quantita scritta a mano batte quella del selettore
+  const qty = parsed && parsed.qty > 1 ? parsed.qty : stepper;
+
+  if (!productId && !parsed) {
+    return c.html(<AddSheet q="" suggestions={[]} location={location} qty={stepper} />);
   }
 
   const product = productId
-    ? (db.prepare('select id, name from products where id = ?').get(productId) as { id: number; name: string } | undefined)
-    : findOrCreateProduct(name, location);
+    ? (db.prepare('select id, name, size from products where id = ?').get(productId) as
+        | { id: number; name: string; size: string | null }
+        | undefined)
+    : findOrCreateProduct(parsed!.name, { size: parsed!.size, location });
   if (!product) return c.text('Prodotto non trovato', 404);
 
   const invId = addStock(product.id, location, qty, user.id);
@@ -95,7 +103,7 @@ inventoryRoutes.post('/inventario/aggiungi', async (c) => {
       suggestions={[]}
       location={location}
       qty={1}
-      justAdded={{ name: product.name, location, undoId: invId }}
+      justAdded={{ name: productLabel(product), location, undoId: invId }}
     />,
   );
 });
