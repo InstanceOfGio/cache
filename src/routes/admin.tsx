@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Env } from '../app.js';
 import { checkpoint, db, dbPath, logActivity, replaceDatabase, setting } from '../db/index.js';
-import { hashPassword } from '../lib/auth.js';
+import { currentSessionId, hashPassword } from '../lib/auth.js';
 import { todayISO } from '../lib/dates.js';
 import { euros } from '../lib/money.js';
 import { PERSON_COLORS, type User } from '../lib/types.js';
 import { Shell } from '../views/layout.js';
-import { AdminPage } from '../views/admin.js';
+import { AdminPage, UserSheet } from '../views/admin.js';
 
 export const adminRoutes = new Hono<Env>();
 
@@ -60,6 +60,45 @@ adminRoutes.post('/utenti', async (c) => {
   logActivity(c.get('user').id, 'admin.user.add', email);
 
   return page(c, { created: { name, email, password } });
+});
+
+const countAdmins = () => (db.prepare("select count(*) as n from users where role = 'admin'").get() as { n: number }).n;
+
+adminRoutes.get('/utenti/:id', (c) => {
+  const user = db.prepare('select * from users where id = ?').get(Number(c.req.param('id'))) as User | undefined;
+  if (!user) return c.text('Utente non trovato', 404);
+  return c.html(
+    <UserSheet user={user} isMe={user.id === c.get('user').id} lastAdmin={user.role === 'admin' && countAdmins() <= 1} />,
+  );
+});
+
+adminRoutes.post('/utenti/:id/password', async (c) => {
+  const id = Number(c.req.param('id'));
+  const me = c.get('user');
+  const user = db.prepare('select * from users where id = ?').get(id) as User | undefined;
+  if (!user) return page(c, { error: 'Utente non trovato.' });
+
+  const typed = String((await c.req.formData()).get('password') ?? '').trim();
+  if (typed && typed.length < 8) return page(c, { error: 'La password deve avere almeno 8 caratteri.' });
+  const password = typed || `${randomBytes(4).toString('hex')}-${randomBytes(3).toString('hex')}`;
+
+  db.prepare('update users set password_hash = ?, must_change = ? where id = ?').run(
+    hashPassword(password),
+    typed ? 0 : 1,
+    id,
+  );
+  // le sessioni aperte con la vecchia password non valgono piu; la propria si tiene
+  db.prepare('delete from sessions where user_id = ? and id <> coalesce(?, \'\')').run(id, id === me.id ? currentSessionId(c) : null);
+  logActivity(me.id, 'admin.user.password', user.email);
+
+  return page(c, {
+    created: {
+      title: `Nuova password per ${user.display_name}`,
+      name: user.display_name,
+      email: user.email,
+      password,
+    },
+  });
 });
 
 adminRoutes.post('/utenti/:id/elimina', (c) => {

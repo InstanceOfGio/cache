@@ -6,7 +6,7 @@ export type Tab = 'inventario' | 'spesa' | 'spese' | 'pasti';
 
 const TABS: { key: Tab; href: string; label: string }[] = [
   { key: 'inventario', href: '/', label: 'Inventario' },
-  { key: 'spesa', href: '/spesa', label: 'Spesa' },
+  { key: 'spesa', href: '/spesa', label: 'Lista spesa' },
   { key: 'spese', href: '/spese', label: 'Spese' },
   { key: 'pasti', href: '/pasti', label: 'Pasti' },
 ];
@@ -120,7 +120,8 @@ const BottomNav: FC<{ tab?: Tab }> = ({ tab }) => (
     {TABS.map((t) => (
       <a
         href={t.href}
-        class={`flex h-[72px] flex-col items-center justify-center gap-1 font-display text-[13px] ${
+        // "Lista spesa" a 320px non sta su una riga: leading-tight lo fa andare a capo pulito
+        class={`flex h-[72px] flex-col items-center justify-center gap-1 px-0.5 text-center font-display text-[13px] leading-tight ${
           tab === t.key ? 'font-bold text-olive dark:text-olive-light' : 'font-semibold text-ink-50 dark:text-dark-muted'
         }`}
       >

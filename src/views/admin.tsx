@@ -1,13 +1,13 @@
 import type { FC } from 'hono/jsx';
 import type { User } from '../lib/types.js';
 import { BackLink } from './layout.js';
-import { Avatar } from './sheet.js';
+import { Avatar, Overlay } from './sheet.js';
 
 interface Props {
   me: User;
   users: User[];
   backup: { size: string; at: string } | null;
-  created?: { name: string; email: string; password: string } | null;
+  created?: { name: string; email: string; password: string; title?: string } | null;
   error?: string | null;
   notice?: string | null;
 }
@@ -22,7 +22,7 @@ export const AdminPage: FC<Props> = ({ me, users, backup, created, error, notice
 
     {created ? (
       <div class="mx-4 mb-4 rounded-md border-1.5 border-olive bg-olive-tint p-3.5 lg:mx-10 dark:bg-olive-deep/40">
-        <div class="font-display text-base font-bold">Utente creato: {created.name}</div>
+        <div class="font-display text-base font-bold">{created.title ?? `Utente creato: ${created.name}`}</div>
         <p class="mt-1 font-body text-sm text-ink-60 dark:text-dark-muted">
           Passala a voce, non la rivedrai più.
         </p>
@@ -46,7 +46,12 @@ export const AdminPage: FC<Props> = ({ me, users, backup, created, error, notice
         <span class="text-ink-50 dark:text-dark-muted">{users.length}</span>
       </div>
       {users.map((u) => (
-        <div class="flex h-14 items-center gap-3 border-b border-dashed border-ink-18 px-4 lg:px-0 dark:border-dark-line">
+        <button
+          class="flex h-14 w-full items-center gap-3 border-b border-dashed border-ink-18 px-4 text-left lg:px-0 dark:border-dark-line"
+          hx-get={`/admin/utenti/${u.id}`}
+          hx-target="#sheet"
+          hx-swap="innerHTML"
+        >
           <Avatar user={u} size={32} />
           <div class="min-w-0 flex-1">
             <div class="truncate font-body text-row">{u.display_name}</div>
@@ -57,20 +62,8 @@ export const AdminPage: FC<Props> = ({ me, users, backup, created, error, notice
           <span class={`badge ${u.role === 'admin' ? 'bg-ink text-paper dark:bg-dark-text dark:text-dark-bg' : 'badge-olive'}`}>
             {u.role === 'admin' ? 'Admin' : 'Membro'}
           </span>
-          {u.id !== me.id ? (
-            <form method="post" action={`/admin/utenti/${u.id}/elimina`} class="flex-none">
-              <button
-                class="flex h-tap w-6 items-center justify-center font-display text-lg text-ink-35 dark:text-dark-muted"
-                aria-label={`Elimina ${u.display_name}`}
-                onclick={`return confirm('Elimino ${u.display_name}? Le sue spese private spariscono con lui.')`}
-              >
-                ×
-              </button>
-            </form>
-          ) : (
-            <span class="w-6 flex-none" />
-          )}
-        </div>
+          <span class="flex-none font-display text-lg text-ink-35 dark:text-dark-muted">›</span>
+        </button>
       ))}
 
       <form method="post" action="/admin/utenti" class="flex flex-col gap-2 px-4 pt-3 lg:px-0">
@@ -134,6 +127,68 @@ export const AdminPage: FC<Props> = ({ me, users, backup, created, error, notice
       <div class="h-8" />
     </div>
   </>
+);
+
+/* ----------------------------------------------------- foglio: un utente */
+
+export const UserSheet: FC<{ user: User; isMe: boolean; lastAdmin: boolean }> = ({ user, isMe, lastAdmin }) => (
+  <Overlay>
+    <div class="sheet max-h-[92dvh] overflow-y-auto">
+      <div class="grab mb-3" />
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-2.5">
+          <Avatar user={user} size={36} />
+          <div class="min-w-0">
+            <div class="truncate font-display text-xl font-extrabold tracking-[-.02em]">{user.display_name}</div>
+            <div class="truncate font-body text-sm text-ink-60 dark:text-dark-muted">{user.email}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-text no-underline text-ink-60 dark:text-dark-muted" onclick="closeSheet()">
+          Chiudi
+        </button>
+      </div>
+
+      <form method="post" action={`/admin/utenti/${user.id}/password`} class="mt-5">
+        <label class="label" for="pwd">
+          Nuova password
+        </label>
+        <input
+          id="pwd"
+          class="field mt-1.5"
+          type="text"
+          name="password"
+          minlength={8}
+          maxlength={72}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck={false}
+          placeholder="lascia vuoto per generarla"
+        />
+        <p class="mt-1.5 font-body text-xs text-ink-60 dark:text-dark-muted">
+          Almeno 8 caratteri. {isMe ? 'Cambiandola resti connesso solo su questo dispositivo.' : `${user.display_name} verrà disconnesso da tutti i dispositivi.`}
+        </p>
+        <button type="submit" class="btn-cta mt-3">
+          Cambia password
+        </button>
+      </form>
+
+      {!isMe && !lastAdmin ? (
+        <form method="post" action={`/admin/utenti/${user.id}/elimina`} class="mt-6 border-t border-dashed border-ink-18 pt-4 dark:border-dark-line">
+          <button
+            class="btn-danger w-full"
+            onclick={`return confirm('Elimino ${user.display_name}? Le sue spese private spariscono con lui.')`}
+          >
+            Elimina {user.display_name}
+          </button>
+        </form>
+      ) : (
+        <p class="mt-6 border-t border-dashed border-ink-18 pt-4 text-center font-body text-xs text-ink-60 dark:border-dark-line dark:text-dark-muted">
+          {isMe ? 'Non puoi eliminare te stesso.' : "Deve restare almeno un'amministrazione."}
+        </p>
+      )}
+      <div class="h-2" />
+    </div>
+  </Overlay>
 );
 
 const DataRow: FC<{ title: string; sub: string; danger?: boolean; children?: unknown }> = ({

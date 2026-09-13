@@ -174,6 +174,28 @@ contains "cio che aggiunge uno lo vede l'altro" "Carta forno" "$(G "$BASE/spesa"
 check "un membro non entra in amministrazione" 403 "$(CODE2 "$BASE/admin")"
 check "un membro non scarica il backup"        403 "$(CODE2 "$BASE/admin/backup")"
 
+# --- cambio password dall'amministrazione --------------------------------
+UID2=$(printf '%s' "$(G "$BASE/admin")" | grep -o '/admin/utenti/[0-9]*"' | tail -1 | grep -o '[0-9]*')
+SHEET=$(G "$BASE/admin/utenti/$UID2")
+contains "foglio utente" "Nuova password" "$SHEET"
+contains "foglio utente: si puo eliminare" "Elimina Caroline" "$SHEET"
+check "password troppo corta rifiutata" 200 "$(CODE -X POST "$BASE/admin/utenti/$UID2/password" -d 'password=corta')"
+contains "e lo dice" "almeno 8 caratteri" "$(G -X POST "$BASE/admin/utenti/$UID2/password" -d 'password=corta')"
+
+NUOVA=$(G -X POST "$BASE/admin/utenti/$UID2/password" -d 'password=nuova-password-scelta')
+contains "cambio password confermato" "Nuova password per Caroline" "$NUOVA"
+
+J3=$(mktemp)
+check "la vecchia password non vale piu" 401 "$(curl -s -o /dev/null -w '%{http_code}' -c "$J3" -X POST "$BASE/login" -d 'email=caroline@casa.it' --data-urlencode "password=$PWD2")"
+check "la nuova password funziona"       302 "$(curl -s -o /dev/null -w '%{http_code}' -c "$J3" -X POST "$BASE/login" -d 'email=caroline@casa.it' -d 'password=nuova-password-scelta')"
+check "le sue sessioni aperte sono cadute" 302 "$(CODE2 "$BASE/spesa")"
+check "l'admin resta connesso"             200 "$(CODE "$BASE/admin")"
+
+# password generata dall'app se il campo e vuoto
+GEN=$(G -X POST "$BASE/admin/utenti/$UID2/password" -d 'password=')
+contains "campo vuoto: la genera lei" "Nuova password per Caroline" "$GEN"
+contains "e la mostra una volta sola" 'id="new-pwd"' "$GEN"
+
 # --- sicurezza -----------------------------------------------------------
 check "POST da altra origine bloccata" 403 "$(CODE -X POST "$BASE/spesa" -H 'Origin: https://malintenzionato.example' -d 'name=x')"
 K=$(mktemp)

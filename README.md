@@ -37,8 +37,8 @@ DATABASE_PATH=./data/cache.sqlite ADMIN_EMAIL=tu@casa.it ADMIN_PASSWORD=una-pass
 BASE=http://localhost:3111 ADMIN_EMAIL=tu@casa.it ADMIN_PASSWORD=una-password bash scripts/smoke.sh
 ```
 
-Il giro copre login, import, soglie, carico della spesa, frammenti htmx, privacy fra utenti, backup e permessi:
-59 controlli. I frammenti htmx meritano attenzione: se uno va in 500, htmx non sostituisce niente e
+Il giro copre login, import, soglie, carico della spesa, frammenti htmx, privacy fra utenti, cambio
+password, backup, ripristino e permessi: 84 controlli. I frammenti htmx meritano attenzione: se uno va in 500, htmx non sostituisce niente e
 l'interfaccia si rompe in silenzio, senza errori a schermo.
 
 ## Le cinque cose che fa
@@ -47,7 +47,7 @@ l'interfaccia si rompe in silenzio, senza errori a schermo.
 (sotto soglia, in scadenza). Tocca il nome per soglia minima, scadenza e posizione. Una riga che
 arriva a zero resta grigia con "Ripristina" per 7 giorni, poi sparisce da sola.
 
-**Lista della spesa** — condivisa fra tutti, con l'iniziale di chi ha aggiunto cosa. Quando un
+**Lista spesa** — condivisa fra tutti, con l'iniziale di chi ha aggiunto cosa. Quando un
 articolo scende sotto la soglia minima compare qui da solo, marcato `Auto · soglia`. In negozio
 spunti, a casa premi **Conferma carico**: correggi le quantità e tutto entra in inventario in un
 colpo.

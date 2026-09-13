@@ -15,7 +15,7 @@ const listFragment = () => {
 shoppingRoutes.get('/', (c) => {
   const { todo, done } = counts();
   return c.html(
-    <Shell title="Spesa" user={c.get('user')} tab="spesa">
+    <Shell title="Lista spesa" user={c.get('user')} tab="spesa">
       <ShoppingPage rows={listOpen()} todo={todo} done={done} />
     </Shell>,
   );

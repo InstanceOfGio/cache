@@ -59,6 +59,11 @@ export function currentUser(c: Context): User | null {
   return row;
 }
 
+/** Id della sessione in corso, per non disconnettere se stessi. */
+export function currentSessionId(c: Context): string | null {
+  return getCookie(c, COOKIE) ?? null;
+}
+
 /** Elimina le sessioni scadute. Chiamata all'avvio. */
 export function pruneSessions() {
   db.prepare("delete from sessions where expires_at < datetime('now')").run();

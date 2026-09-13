@@ -86,7 +86,7 @@ export const List: FC<{ rows: ShoppingRow[]; done: number }> = ({ rows, done }) 
 export const ShoppingPage: FC<{ rows: ShoppingRow[]; todo: number; done: number }> = ({ rows, todo, done }) => (
   <div class="mx-auto flex w-full flex-1 flex-col lg:max-w-3xl">
     <div class="flex items-baseline justify-between gap-3 px-4 pb-2.5 pt-2 lg:px-0 lg:pt-7">
-      <h1 class="font-display text-title lg:text-[34px]">Spesa</h1>
+      <h1 class="font-display text-title lg:text-[34px]">Lista spesa</h1>
       <span class="font-display text-sm font-semibold text-ink-50 dark:text-dark-muted">
         {todo} da prendere · {done} fatti
       </span>
@@ -121,7 +121,7 @@ export const ShoppingPage: FC<{ rows: ShoppingRow[]; todo: number; done: number 
 
 export const LoadPage: FC<{ lines: LoadLine[] }> = ({ lines }) => (
   <div class="mx-auto flex w-full flex-1 flex-col lg:max-w-3xl">
-    <BackLink href="/spesa" label="Spesa" />
+    <BackLink href="/spesa" label="Lista spesa" />
     <h1 class="px-4 pb-1 pt-2 font-display text-title lg:px-0">Entra in casa</h1>
     <p class="px-4 pb-3.5 font-body text-base text-ink-60 lg:px-0 dark:text-dark-muted">
       {lines.length} {lines.length === 1 ? 'articolo spuntato' : 'articoli spuntati'}. Correggi le quantità se al negozio è
