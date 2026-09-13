@@ -19,6 +19,9 @@ export interface InventoryRow {
   product_id: number;
   name: string;
   size: string | null;
+  size_value: number | null;
+  size_unit: string | null;
+  category: string | null;
   unit: string | null;
   location: string;
   qty: number;
@@ -32,6 +35,7 @@ export interface ShoppingRow {
   product_id: number | null;
   name: string;
   size: string | null;
+  category: string | null;
   qty: number;
   note: string | null;
   source: 'manual' | 'threshold' | 'llm';
@@ -57,5 +61,45 @@ export interface ExpenseRow {
 }
 
 export const LOCATIONS = ['Dispensa', 'Frigo', 'Freezer', 'Bagno', 'Cantina'] as const;
+
+/**
+ * Le categorie della roba di casa, nell'ordine in cui si attraversa il
+ * supermercato: cosi la lista della spesa ordinata per categoria e anche il
+ * giro fra le corsie. Una riga senza categoria finisce in fondo, in "Altro".
+ */
+export const PRODUCT_CATEGORIES = [
+  'Frutta e verdura',
+  'Carne e pesce',
+  'Latticini e uova',
+  'Pasta, riso e pane',
+  'Scatolame e conserve',
+  'Condimenti e spezie',
+  'Colazione e dolci',
+  'Bevande',
+  'Surgelati',
+  'Casa e pulizia',
+  'Cura persona',
+  'Altro',
+] as const;
+
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+
+export const NO_CATEGORY = 'Altro';
+
+/** Ritorna la categoria se e una di quelle previste, altrimenti null. */
+export function validCategory(s: string | null | undefined): ProductCategory | null {
+  return PRODUCT_CATEGORIES.includes(s as ProductCategory) ? (s as ProductCategory) : null;
+}
+
+/** Come si chiama il gruppo: senza categoria si finisce in "Altro". */
+export function categoryLabel(s: string | null | undefined): ProductCategory {
+  return validCategory(s) ?? NO_CATEGORY;
+}
+
+/** Indice per l'ordinamento, nell'ordine delle corsie. */
+export function categoryRank(s: string | null | undefined): number {
+  return PRODUCT_CATEGORIES.indexOf(categoryLabel(s));
+}
+
 export const EXPENSE_CATEGORIES = ['Casa', 'Cibo', 'Trasporti', 'Salute', 'Altro'] as const;
 export const PERSON_COLORS = ['#5C6B2A', '#C4643A', '#7D4A73', '#3F5F73', '#8A6D2F', '#4A6B63'] as const;

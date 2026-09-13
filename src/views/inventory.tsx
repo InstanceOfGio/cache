@@ -1,10 +1,11 @@
 import type { FC } from 'hono/jsx';
-import { badgeFor, type Filter } from '../lib/inventory.js';
+import { badgeFor, groupOf, type Filter, type Group } from '../lib/inventory.js';
+import { measureOf } from '../lib/measure.js';
 import { qtyLabel } from '../lib/money.js';
 import type { Suggestion } from '../lib/products.js';
 import { parseLine } from '../lib/parse.js';
 import { LOCATIONS, type InventoryRow } from '../lib/types.js';
-import { Overlay } from './sheet.js';
+import { CategorySelect, MeasureField, Overlay } from './sheet.js';
 
 /* --------------------------------------------------------------- una riga */
 
@@ -64,7 +65,12 @@ export const Row: FC<{ row: InventoryRow }> = ({ row }) => {
 
 /* ------------------------------------------------------------- la lista */
 
-export const List: FC<{ rows: InventoryRow[]; q: string; filter: Filter }> = ({ rows, q, filter }) => {
+export const List: FC<{ rows: InventoryRow[]; q: string; filter: Filter; group: Group }> = ({
+  rows,
+  q,
+  filter,
+  group,
+}) => {
   if (!rows.length) {
     return (
       <div id="list" class="flex-1">
@@ -84,18 +90,20 @@ export const List: FC<{ rows: InventoryRow[]; q: string; filter: Filter }> = ({ 
       </div>
     );
   }
-  const groups: { loc: string; items: InventoryRow[] }[] = [];
+  // le righe arrivano gia nell'ordine giusto: qui si taglia soltanto
+  const groups: { title: string; items: InventoryRow[] }[] = [];
   for (const r of rows) {
+    const title = groupOf(r, group);
     const last = groups[groups.length - 1];
-    if (last && last.loc === r.location) last.items.push(r);
-    else groups.push({ loc: r.location, items: [r] });
+    if (last && last.title === title) last.items.push(r);
+    else groups.push({ title, items: [r] });
   }
   return (
     <div id="list" class="flex-1">
       {groups.map((g) => (
         <>
           <div class="band sticky top-0 z-10">
-            <span>{g.loc}</span>
+            <span>{g.title}</span>
             <span class="text-ink-50 dark:text-dark-muted">{g.items.length}</span>
           </div>
           {g.items.map((row) => (
@@ -114,10 +122,11 @@ interface PageProps {
   rows: InventoryRow[];
   q: string;
   filter: Filter;
+  group: Group;
   counts: { threshold: number; expiring: number };
 }
 
-export const InventoryPage: FC<PageProps> = ({ rows, q, filter, counts }) => (
+export const InventoryPage: FC<PageProps> = ({ rows, q, filter, group, counts }) => (
   // su schermo largo la lista si ferma: righe da 1100px allontanano i - e + dal nome
   <div class="mx-auto flex w-full flex-1 flex-col lg:max-w-3xl">
     <div class="flex items-center justify-between gap-3 px-4 pb-2.5 pt-2 lg:px-0 lg:pt-7">
@@ -140,15 +149,17 @@ export const InventoryPage: FC<PageProps> = ({ rows, q, filter, counts }) => (
       </div>
     </div>
 
+    {/* flex-wrap e non una riga sola: con due filtri accesi su un telefono
+        stretto i chip vanno a capo invece di far sbordare la pagina */}
     <form
-      class="flex gap-2 px-4 pb-2.5 lg:px-0"
+      class="flex flex-wrap gap-2 px-4 pb-2.5 lg:px-0"
       hx-get="/inventario/lista"
       hx-target="#list"
       hx-swap="outerHTML"
       hx-trigger="input changed delay:200ms from:find input[name=q], change"
     >
       <input
-        class="field h-tap flex-1"
+        class="field h-tap min-w-[150px] flex-1"
         type="search"
         name="q"
         value={q}
@@ -156,11 +167,21 @@ export const InventoryPage: FC<PageProps> = ({ rows, q, filter, counts }) => (
         autocomplete="off"
         enterkeyhint="search"
       />
+      {/* un tap cambia come sono raggruppate le fasce; la scelta resta */}
+      <a
+        href={`/?grp=${group === 'cat' ? 'loc' : 'cat'}`}
+        class="flex h-tap flex-none items-center gap-1 whitespace-nowrap rounded-md border-1.5 border-ink-28 px-3 font-display text-label uppercase text-ink dark:border-dark-line30 dark:text-dark-text"
+        aria-label={`Raggruppato per ${group === 'cat' ? 'categoria' : 'posizione'}: tocca per cambiare`}
+      >
+        <span aria-hidden="true">⇅</span> {group === 'cat' ? 'Categoria' : 'Posizione'}
+      </a>
       <Chip name="soglia" active={filter === 'threshold'} count={counts.threshold} label="Soglia" kind="threshold" />
       <Chip name="scad" active={filter === 'expiring'} count={counts.expiring} label="Scad." kind="expiring" />
+      {/* il frammento deve sapere come raggruppare tanto quanto la pagina intera */}
+      <input type="hidden" name="grp" value={group} />
     </form>
 
-    <List rows={rows} q={q} filter={filter} />
+    <List rows={rows} q={q} filter={filter} group={group} />
 
     <div class="cta-bar">
       <button class="btn-cta" hx-get="/inventario/nuovo" hx-target="#sheet" hx-swap="innerHTML">
@@ -201,10 +222,12 @@ interface SheetProps {
   suggestions: Suggestion[];
   location: string;
   qty: number;
+  /** Resta selezionata fra un articolo e l'altro: di solito se ne carica una serie. */
+  category?: string | null;
   justAdded?: { name: string; location: string; undoId: number } | null;
 }
 
-export const AddSheet: FC<SheetProps> = ({ q, suggestions, location, qty, justAdded }) => (
+export const AddSheet: FC<SheetProps> = ({ q, suggestions, location, qty, category, justAdded }) => (
   <Overlay>
     <form
       class="sheet"
@@ -288,8 +311,13 @@ export const AddSheet: FC<SheetProps> = ({ q, suggestions, location, qty, justAd
         </div>
       </div>
 
+      <div class="mt-2 flex gap-2">
+        <MeasureField className="flex-1" />
+        <CategorySelect value={category} className="flex-1" />
+      </div>
+
       <p class="mt-2 font-body text-xs text-ink-60 dark:text-dark-muted">
-        Ultima posizione usata preselezionata. Tocca un suggerimento e l'articolo entra subito.
+        Misura e categoria si possono lasciare vuote. La misura scritta nel nome — “ceci 230 gr” — vale lo stesso.
       </p>
       <button type="submit" class="btn-cta mt-3">
         Aggiungi{q.trim() ? ` “${q.trim()}”` : ''}
@@ -379,6 +407,26 @@ export const DetailSheet: FC<{ row: InventoryRow }> = ({ row }) => (
 
       <div class="mt-4 grid grid-cols-2 gap-3">
         <div>
+          <label class="label" for="qty">
+            Quantità
+          </label>
+          <input
+            id="qty"
+            class="field mt-1.5 tnum"
+            type="number"
+            name="qty"
+            min="0"
+            step="any"
+            value={String(row.qty)}
+            inputmode="decimal"
+            autocomplete="off"
+          />
+        </div>
+        <MeasureField label="Misura" measure={measureOf(row)} />
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-3">
+        <div>
           <label class="label" for="min_qty">
             Soglia minima
           </label>
@@ -402,6 +450,8 @@ export const DetailSheet: FC<{ row: InventoryRow }> = ({ row }) => (
         </div>
       </div>
 
+      <CategorySelect label="Categoria" value={row.category} className="mt-4" />
+
       <div class="label mt-4">Posizione</div>
       <div class="mt-1.5 flex gap-1.5 overflow-x-auto">
         {LOCATIONS.map((l) => (
@@ -419,7 +469,8 @@ export const DetailSheet: FC<{ row: InventoryRow }> = ({ row }) => (
       </div>
 
       <p class="mt-3 font-body text-xs text-ink-60 dark:text-dark-muted">
-        Sotto la soglia l'articolo finisce da solo nella lista della spesa.
+        Sotto la soglia l'articolo finisce da solo nella lista della spesa. Svuota la misura o metti la quantità a zero
+        per toglierle: sono due cose separate.
       </p>
 
       <button type="submit" class="btn-cta mt-4">

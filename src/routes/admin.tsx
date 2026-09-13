@@ -217,12 +217,12 @@ function sendCsv(c: Context<Env>, name: string, rows: unknown[][]) {
 adminRoutes.get('/export.csv', (c) => {
   const rows = db
     .prepare(
-      `select p.name, i.location, i.qty, p.unit, i.min_qty, i.expires_on, i.updated_at
+      `select p.name, p.size, p.category, i.location, i.qty, i.min_qty, i.expires_on, i.updated_at
        from inventory i join products p on p.id = i.product_id order by i.location, p.name`,
     )
     .all() as Record<string, unknown>[];
   return sendCsv(c, 'inventario', [
-    ['prodotto', 'posizione', 'quantita', 'unita', 'soglia', 'scadenza', 'aggiornato'],
+    ['prodotto', 'misura', 'categoria', 'posizione', 'quantita', 'soglia', 'scadenza', 'aggiornato'],
     ...rows.map((r) => Object.values(r)),
   ]);
 });

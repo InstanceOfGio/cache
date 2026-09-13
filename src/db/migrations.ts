@@ -1,5 +1,15 @@
+import type { Database } from 'better-sqlite3';
+import { parseMeasure } from '../lib/measure.js';
+
+export interface Migration {
+  name: string;
+  sql: string;
+  /** Ritocchi che l'SQL non sa fare. Gira nella stessa transazione dell'sql. */
+  after?: (d: Database) => void;
+}
+
 /** Migrazioni in ordine. Mai modificare una migrazione già applicata: aggiungine una nuova. */
-export const migrations: { name: string; sql: string }[] = [
+export const migrations: Migration[] = [
   {
     name: '001_init',
     sql: `
@@ -131,5 +141,33 @@ create table settings (k text primary key, v text not null);
 -- distinte in dispensa), quindi entra anche in products.norm.
 alter table products add column size text;
 `,
+  },
+  {
+    name: '003_measure_and_category',
+    sql: `
+-- La misura diventa due campi separati, cosi si puo togliere il numero
+-- senza toccare il nome e viceversa. \`size\` resta il testo da mostrare,
+-- ed e quello che entra in products.norm: l'identita non cambia mai da sola.
+alter table products add column size_value real;
+alter table products add column size_unit  text;
+
+create index products_category_idx on products(category);
+`,
+    after(d) {
+      // riempie i campi nuovi leggendo le misure gia scritte ("230 g" -> 230 + g)
+      const rows = d.prepare("select id, size from products where size is not null and size <> ''").all() as {
+        id: number;
+        size: string;
+      }[];
+      const upd = d.prepare('update products set size_value = ?, size_unit = ? where id = ?');
+      let n = 0;
+      for (const r of rows) {
+        const m = parseMeasure(r.size);
+        if (!m) continue; // formato non riconosciuto: resta solo il testo
+        upd.run(m.value, m.unit, r.id);
+        n++;
+      }
+      if (n) console.log(`[db] misure convertite: ${n}`);
+    },
   },
 ];

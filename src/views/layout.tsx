@@ -84,8 +84,13 @@ export const Shell: FC<PropsWithChildren<ShellProps>> = ({ title, user, tab, bar
   </html>
 );
 
+/**
+ * Alta quanto lo schermo e ancorata: senza `sticky` la colonna si allunga
+ * insieme alla pagina, e su un inventario da cento righe il nome dell'utente
+ * finisce a tremila pixel di distanza — cioe invisibile.
+ */
 const Sidebar: FC<{ user: User | null; tab?: Tab }> = ({ user, tab }) => (
-  <aside class="hidden w-[200px] flex-none flex-col gap-1.5 bg-paper-band px-5 py-7 lg:flex dark:bg-dark-band">
+  <aside class="hidden w-[200px] flex-none flex-col gap-1.5 bg-paper-band px-5 py-7 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:overflow-y-auto dark:bg-dark-band">
     <a href="/" class="mb-7 flex items-center gap-2.5">
       <Jar size={32} />
       <span class="font-display text-[22px] font-extrabold tracking-[-.02em]">Cache</span>

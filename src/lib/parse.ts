@@ -6,6 +6,8 @@
  * e una busta da 1150 grammi, non 1150 buste.
  */
 
+import { fmtMeasure, type Measure, type MeasureUnit } from './measure.js';
+
 const UNITS: Record<string, string> = {
   g: 'g', gr: 'g', gramm: 'g', grammi: 'g', grammo: 'g',
   gt: 'g', // refuso comune per "gr"
@@ -31,6 +33,8 @@ const MONTHS: Record<string, number> = {
 
 export interface ParsedLine {
   name: string;
+  measure: Measure | null;
+  /** La misura scritta per esteso: "230 g". Derivata da `measure`. */
   size: string | null;
   qty: number;
   /** true se la riga diceva "+2": somma invece di impostare. */
@@ -49,11 +53,14 @@ export function stripBullet(line: string): string {
 }
 
 /** Parole che descrivono il peso, non il prodotto: "Olive toscane sgocciolate". */
-const NOISE = /\b(?:sgocciolat[oiae]|sgocc|scolat[oiae]|netto|lordo|circa|ca)\b/gi;
+const NOISE = /\b(?:sgocciolat[oiae]|sgocc|scolat[oiae]|netto|lordo|circa|ca|sotto\s+soglia)\b/gi;
 
 function tidy(s: string): string {
   return s
+    // "[Scatolame e conserve]": la categoria, nell'inventario esportato per l'LLM
+    .replace(/\[[^\]]*\]/g, ' ')
     .replace(NOISE, ' ')
+    .replace(/\(\s*\)/g, ' ')
     .replace(/\s*[x×]\s*$/i, '')
     .replace(/[/,;:=+]+\s*$/, '')
     .replace(/(?:^|\s)(?:da|di|per)\s*$/i, '') // preposizione rimasta orfana
@@ -75,22 +82,24 @@ function plausibleCount(raw: string): number | null {
 
 const num = (s: string) => Number(s.replace(',', '.'));
 
-/** Formato leggibile: "230 g", "1,5 kg". */
-function formatSize(value: number, unit: string): string {
-  const v = Number.isInteger(value) ? String(value) : String(value).replace('.', ',');
-  return `${v} ${unit}`;
-}
-
 /**
- * Il primo peso/volume della riga diventa il formato; gli altri (peso sgocciolato,
+ * Il primo peso/volume della riga diventa la misura; gli altri (peso sgocciolato,
  * peso totale) vengono tolti dal nome perche non aggiungono identita.
+ *
+ * I centilitri sono l'unica unita che convertiamo — in millilitri — perche non
+ * sono fra quelle che si possono scegliere a mano.
  */
-export function extractSize(text: string): { rest: string; size: string | null } {
+export function extractSize(text: string): { rest: string; measure: Measure | null } {
   const matches = [...text.matchAll(UNIT_RE)];
-  if (!matches.length) return { rest: text, size: null };
+  if (!matches.length) return { rest: text, measure: null };
   const first = matches[0]!;
-  const size = formatSize(num(first[1]!), UNITS[first[2]!.toLowerCase()]!);
-  return { rest: tidy(text.replace(UNIT_RE, ' ')), size };
+  let value = num(first[1]!);
+  let unit = UNITS[first[2]!.toLowerCase()]!;
+  if (unit === 'cl') {
+    value = Math.round(value * 10 * 1000) / 1000;
+    unit = 'ml';
+  }
+  return { rest: tidy(text.replace(UNIT_RE, ' ')), measure: { value, unit: unit as MeasureUnit } };
 }
 
 /** "scade 17 settembre", "scadono 21 09", "scad. 21/09/2026". */
@@ -170,7 +179,8 @@ export function parseLine(raw: string, today = new Date()): ParsedLine | null {
 
   return {
     name: name.charAt(0).toUpperCase() + name.slice(1),
-    size: withSize.size,
+    measure: withSize.measure,
+    size: fmtMeasure(withSize.measure),
     qty: withCount.qty ?? 1,
     add: withCount.add,
     expiresOn: withExpiry.expiresOn,

@@ -43,14 +43,50 @@ l'interfaccia si rompe in silenzio, senza errori a schermo.
 
 ## Le cinque cose che fa
 
-**Inventario** — righe raggruppate per posizione, `−`/`+` da 44px, ricerca e due filtri rapidi
-(sotto soglia, in scadenza). Tocca il nome per soglia minima, scadenza e posizione. Una riga che
-arriva a zero resta grigia con "Ripristina" per 7 giorni, poi sparisce da sola.
+**Inventario** — righe raggruppate per posizione **o per categoria** (il chip `⇅` accanto alla
+ricerca cambia, e la scelta resta), `−`/`+` da 44px, ricerca e due filtri rapidi (sotto soglia, in
+scadenza). Tocca il nome per quantità, misura, categoria, soglia minima, scadenza e posizione. Una
+riga che arriva a zero resta grigia con "Ripristina" per 7 giorni, poi sparisce da sola.
 
-**Lista spesa** — condivisa fra tutti, con l'iniziale di chi ha aggiunto cosa. Quando un
-articolo scende sotto la soglia minima compare qui da solo, marcato `Auto · soglia`. In negozio
-spunti, a casa premi **Conferma carico**: correggi le quantità e tutto entra in inventario in un
-colpo.
+**Lista spesa** — condivisa fra tutti, con l'iniziale di chi ha aggiunto cosa, **in ordine di
+corsia**: le categorie si susseguono come nel supermercato. Quando un articolo scende sotto la
+soglia minima compare qui da solo, marcato `Auto · soglia`. In negozio spunti, a casa premi
+**Conferma carico**: correggi le quantità e tutto entra in inventario in un colpo.
+
+### Le due quantità
+
+Ogni articolo ha **due numeri indipendenti**, e si possono togliere uno alla volta:
+
+| | dov'è | com'è fatta | come si toglie |
+|---|---|---|---|
+| **Misura** | sul prodotto in catalogo | numero + unità (`g`, `kg`, `ml`, `l`) | svuota il numero |
+| **Quantità** | sulla riga di inventario | quante confezioni ci sono | mettila a zero |
+
+La misura è il *formato della confezione*, e fa parte dell'identità del prodotto: `Ceci 230 g` e
+`Ceci 400 g` sono due barattoli diversi, quindi due righe diverse. Per questo cambiarla dal foglio
+dei dettagli può far confluire il prodotto in uno che esiste già: in quel caso le due schede
+**vengono fuse** e le quantità sommate, invece di sbattere contro l'unicità del catalogo.
+
+Scriverla dentro al nome funziona lo stesso — `ceci 230 gr x4` è misura `230 g` e quantità `4` — ma
+se compili il campo apposta, vince quello.
+
+### Le categorie
+
+Dodici, in `src/lib/types.ts`, **nell'ordine in cui si attraversa il supermercato**. Non è un
+dettaglio estetico: è quello che rende la lista della spesa un giro fra le corsie. Chi non ne ha
+finisce in "Altro", in fondo.
+
+Si sceglie quando aggiungi (inventario e lista spesa) e si corregge dal foglio dei dettagli. Su un
+prodotto che esiste già la categoria **riempie un buco e non sovrascrive**: una scelta fatta a mano
+resta. Per non partire con tutto dentro "Altro" c'è una passata a parole chiave:
+
+```bash
+npx tsx scripts/categorize.ts            # mostra cosa farebbe
+npx tsx scripts/categorize.ts --scrivi   # lo fa
+```
+
+Sono indovinelli, quindi sta fuori dalle migrazioni: tocca solo le schede senza categoria, e
+ritoccare la tabella delle regole e rilanciarlo non costa niente.
 
 **Spese** — due schede. *Le mie* le vede solo chi le ha create; *Comuni* le vedono tutti, ogni voce
 con l'avatar di chi ha pagato e il totale del mese spezzato per persona. Una spesa può essere una
@@ -159,6 +195,7 @@ scripts/
   vendor.mjs          copia htmx, disegna le icone PWA, scrive il manifest
   test-parse.ts       casi veri per il parser (npm run test:parse)
   dry-run-import.ts   mostra come verrebbe letto un file, senza scrivere niente
+  categorize.ts       indovina le categorie mancanti (--scrivi per applicarle)
   smoke.sh            il giro completo su un'istanza avviata
 ```
 
@@ -170,6 +207,9 @@ scripts/
 - **Il catalogo prodotti è l'unico posto dove vive un nome.** Inventario e lista spesa puntano a
   `products`, con `product_aliases` per "latte" → "Latte intero". È questo che rende automatico il
   passaggio dalla spesa all'inventario.
+- **La misura sta sul prodotto, la quantità sulla riga.** Cambiare la misura cambia l'identità in
+  catalogo, e può far collidere due schede: `setProductMeasure()` le fonde invece di far fallire
+  l'update. Se tocchi quella strada, guarda `mergeProducts()`.
 - **Gli importi sono interi in centesimi.** Niente float sui soldi.
 - **Le date sono stringhe `YYYY-MM-DD` in ora di Roma** (`src/lib/dates.ts`), non timestamp.
 - **`src/env.ts` va importato per primo** in `index.ts`. `src/db/index.ts` legge `DATABASE_PATH`

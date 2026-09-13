@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../app.js';
-import { db, logActivity } from '../db/index.js';
+import { db, logActivity, setting } from '../db/index.js';
 import {
   adjustQty,
   addStock,
@@ -8,30 +8,62 @@ import {
   getRow,
   listInventory,
   purgeZeroed,
+  saveDetails,
   syncThreshold,
-  updateDetails,
+  validGroup,
   type Filter,
+  type Group,
 } from '../lib/inventory.js';
+import { measureFromForm } from '../lib/measure.js';
 import { parseLine } from '../lib/parse.js';
-import { findOrCreateProduct, productLabel, suggestProducts, validLocation } from '../lib/products.js';
+import {
+  findOrCreateProduct,
+  getProduct,
+  productLabel,
+  setProductCategory,
+  suggestProducts,
+  validLocation,
+} from '../lib/products.js';
+import { validCategory } from '../lib/types.js';
 import { isValidISODate } from '../lib/dates.js';
 import { Shell } from '../views/layout.js';
 import { AddSheet, DetailSheet, InventoryPage, List, Row, Suggestions } from '../views/inventory.js';
 
 export const inventoryRoutes = new Hono<Env>();
 
-function readQuery(c: { req: { query: (k: string) => string | undefined } }): { q: string; filter: Filter } {
+type Req = { req: { query: (k: string) => string | undefined } };
+
+function readQuery(c: Req): { q: string; filter: Filter } {
   const q = (c.req.query('q') ?? '').slice(0, 80);
   const filter: Filter = c.req.query('soglia') ? 'threshold' : c.req.query('scad') ? 'expiring' : null;
   return { q, filter };
 }
 
+/**
+ * Come raggruppare la lista. Senza `grp` nell'indirizzo vale l'ultima scelta:
+ * e una preferenza, non un filtro, e deve sopravvivere al ricaricamento.
+ */
+function readGroup(c: Req, userId: number): Group {
+  const raw = c.req.query('grp');
+  if (raw === undefined) return validGroup(setting.get(`inv_group_${userId}`));
+  const group = validGroup(raw);
+  setting.set(`inv_group_${userId}`, group);
+  return group;
+}
+
 inventoryRoutes.get('/', (c) => {
   purgeZeroed();
   const { q, filter } = readQuery(c);
+  const group = readGroup(c, c.get('user').id);
   return c.html(
     <Shell title="Inventario" user={c.get('user')} tab="inventario">
-      <InventoryPage rows={listInventory(q, filter)} q={q} filter={filter} counts={countsByKind()} />
+      <InventoryPage
+        rows={listInventory(q, filter, group)}
+        q={q}
+        filter={filter}
+        group={group}
+        counts={countsByKind()}
+      />
     </Shell>,
   );
 });
@@ -39,7 +71,8 @@ inventoryRoutes.get('/', (c) => {
 /** Frammento: solo la lista, per ricerca e filtri. */
 inventoryRoutes.get('/inventario/lista', (c) => {
   const { q, filter } = readQuery(c);
-  return c.html(<List rows={listInventory(q, filter)} q={q} filter={filter} />);
+  const group = readGroup(c, c.get('user').id);
+  return c.html(<List rows={listInventory(q, filter, group)} q={q} filter={filter} group={group} />);
 });
 
 inventoryRoutes.post('/inventario/:id/qty', (c) => {
@@ -71,22 +104,24 @@ inventoryRoutes.post('/inventario/aggiungi', async (c) => {
   const productId = Number(form.get('product_id') ?? 0) || null;
   const stepper = Math.max(0.01, Number(form.get('qty') ?? 1) || 1);
   const location = validLocation(String(form.get('location') ?? ''));
+  const category = validCategory(String(form.get('category') ?? ''));
+  const typedMeasure = measureFromForm(form.get('measure_value'), form.get('measure_unit'));
 
   // il campo accetta tutto di getto: "Ceci 230 gr x4"
   const parsed = typed ? parseLine(typed) : null;
   // una quantita scritta a mano batte quella del selettore
   const qty = parsed && parsed.qty > 1 ? parsed.qty : stepper;
+  // e cosi la misura: il campo apposta vince su quella letta dentro al nome
+  const measure = typedMeasure ?? parsed?.measure ?? null;
 
   if (!productId && !parsed) {
-    return c.html(<AddSheet q="" suggestions={[]} location={location} qty={stepper} />);
+    return c.html(<AddSheet q="" suggestions={[]} location={location} qty={stepper} category={category} />);
   }
 
-  const product = productId
-    ? (db.prepare('select id, name, size from products where id = ?').get(productId) as
-        | { id: number; name: string; size: string | null }
-        | undefined)
-    : findOrCreateProduct(parsed!.name, { size: parsed!.size, location });
+  const product = productId ? getProduct(productId) : findOrCreateProduct(parsed!.name, { measure, location, category });
   if (!product) return c.text('Prodotto non trovato', 404);
+  // suggerimento toccato: la categoria riempie un buco, non sovrascrive una scelta
+  if (productId && category && !product.category) setProductCategory(product.id, category);
 
   const invId = addStock(product.id, location, qty, user.id);
   logActivity(user.id, 'inv.add', `${product.name} +${qty} in ${location}`);
@@ -96,13 +131,15 @@ inventoryRoutes.post('/inventario/aggiungi', async (c) => {
   );
 
   c.header('HX-Trigger', JSON.stringify({ 'cache:refresh': { url: '/inventario/lista', target: '#list' } }));
-  // il foglio resta aperto, pronto per il prossimo articolo
+  // il foglio resta aperto, pronto per il prossimo articolo: la categoria di
+  // solito e la stessa per tutta la serie, la misura no
   return c.html(
     <AddSheet
       q=""
       suggestions={[]}
       location={location}
       qty={1}
+      category={category}
       justAdded={{ name: productLabel(product), location, undoId: invId }}
     />,
   );
@@ -134,12 +171,17 @@ inventoryRoutes.post('/inventario/:id/dettagli', async (c) => {
   const form = await c.req.formData();
   const minRaw = String(form.get('min_qty') ?? '').trim();
   const expRaw = String(form.get('expires_on') ?? '').trim();
-  updateDetails(
+  // campo assente = non lo tocchiamo; campo svuotato a mano = zero voluto
+  const qtyRaw = form.get('qty');
+  saveDetails(
     id,
     {
+      qty: qtyRaw === null ? undefined : Math.max(0, Number(String(qtyRaw).trim().replace(',', '.')) || 0),
       min_qty: minRaw === '' ? null : Math.max(0, Number(minRaw.replace(',', '.')) || 0),
       expires_on: expRaw && isValidISODate(expRaw) ? expRaw : null,
       location: validLocation(String(form.get('location') ?? '')),
+      measure: measureFromForm(form.get('measure_value'), form.get('measure_unit')),
+      category: validCategory(String(form.get('category') ?? '')),
     },
     c.get('user').id,
   );

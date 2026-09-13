@@ -29,6 +29,7 @@ function migrate(d: Database.Database) {
     if (applied.has(m.name)) continue;
     d.transaction(() => {
       d.exec(m.sql);
+      m.after?.(d);
       d.prepare('insert into schema_migrations (name) values (?)').run(m.name);
     })();
     console.log(`[db] migrazione applicata: ${m.name}`);

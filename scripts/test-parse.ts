@@ -51,6 +51,22 @@ const CASI: Caso[] = [
 
   // il "+" somma invece di impostare
   { in: 'Farina: +2', name: 'Farina', size: null, qty: 2 },
+
+  // l'inventario esportato per l'LLM, reincollato tale e quale
+  { in: '- Ceci 230 g x3 [Scatolame e conserve]', name: 'Ceci', size: '230 g', qty: 3 },
+  { in: '- Passata pomodoro 700 g x1 (sotto soglia)', name: 'Passata pomodoro', size: '700 g', qty: 1 },
+
+  // i centilitri diventano millilitri: sono le uniche due unita scegliibili a mano
+  { in: 'Panna da cucina 20 cl', name: 'Panna da cucina', size: '200 ml', qty: 1 },
+];
+
+/** La misura letta dev'essere anche scomponibile: e cosi che arriva nei campi. */
+const MISURE: [string, number | null, string | null][] = [
+  ['Ceci 230 gr', 230, 'g'],
+  ['Farina 00 1kg', 1, 'kg'],
+  ['Latte 500 ml', 500, 'ml'],
+  ['Olio 1,5 l', 1.5, 'l'],
+  ['Zafferano 3 buste', null, null],
 ];
 
 const OGGI = new Date('2026-09-13T12:00:00Z');
@@ -77,6 +93,19 @@ for (const c of CASI) {
   }
 }
 
+console.log('\nmisura scomposta\n');
+for (const [input, value, unit] of MISURE) {
+  const m = parseLine(input, OGGI)?.measure ?? null;
+  const got = m ? `${m.value} ${m.unit}` : 'nessuna';
+  const atteso = value === null ? 'nessuna' : `${value} ${unit}`;
+  if (got !== atteso) {
+    falliti++;
+    console.log(`  FALLITO  "${input}" -> ${got} invece di ${atteso}`);
+  } else {
+    console.log(`  ok       ${input.padEnd(22)} -> ${atteso}`);
+  }
+}
+
 console.log('\nstripWhatsApp\n');
 const PREFISSI: [string, string][] = [
   ['[15:19, 9/13/2026] F.: 4 x ceci 230gr', '4 x ceci 230gr'],
@@ -93,5 +122,5 @@ for (const [input, atteso] of PREFISSI) {
   }
 }
 
-console.log(`\npassati: ${CASI.length + PREFISSI.length - falliti}   falliti: ${falliti}`);
+console.log(`\npassati: ${CASI.length + MISURE.length + PREFISSI.length - falliti}   falliti: ${falliti}`);
 process.exit(falliti ? 1 : 0);

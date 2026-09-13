@@ -1,8 +1,9 @@
 import type { FC } from 'hono/jsx';
 import { qtyLabel } from '../lib/money.js';
 import type { LoadLine } from '../lib/shopping.js';
-import type { ShoppingRow } from '../lib/types.js';
+import { categoryLabel, type ShoppingRow } from '../lib/types.js';
 import { Avatar, BackLink } from './layout.js';
+import { CategorySelect } from './sheet.js';
 
 export const Row: FC<{ row: ShoppingRow }> = ({ row }) => {
   const done = !!row.checked_at;
@@ -56,10 +57,34 @@ export const Row: FC<{ row: ShoppingRow }> = ({ row }) => {
   );
 };
 
-export const List: FC<{ rows: ShoppingRow[]; done: number }> = ({ rows, done }) => (
+export const List: FC<{ rows: ShoppingRow[]; done: number }> = ({ rows, done }) => {
+  // le righe arrivano gia in ordine di categoria: scorrere la lista e fare il
+  // giro delle corsie. Le fasce compaiono solo se c'e davvero piu di un gruppo.
+  const groups: { title: string; items: ShoppingRow[] }[] = [];
+  for (const r of rows) {
+    const title = r.checked_at ? 'Presi' : categoryLabel(r.category);
+    const last = groups[groups.length - 1];
+    if (last && last.title === title) last.items.push(r);
+    else groups.push({ title, items: [r] });
+  }
+  const bands = groups.length > 1;
+
+  return (
   <div id="shop-list" class="flex flex-1 flex-col">
     {rows.length ? (
-      rows.map((r) => <Row row={r} />)
+      groups.map((g) => (
+        <>
+          {bands ? (
+            <div class="band">
+              <span>{g.title}</span>
+              <span class="text-ink-50 dark:text-dark-muted">{g.items.length}</span>
+            </div>
+          ) : null}
+          {g.items.map((r) => (
+            <Row row={r} />
+          ))}
+        </>
+      ))
     ) : (
       <div class="m-4 rounded-md border border-dashed border-ink-28 px-4 py-7 text-center dark:border-dark-line30">
         <div class="font-display text-lg font-bold">Lista vuota</div>
@@ -81,7 +106,8 @@ export const List: FC<{ rows: ShoppingRow[]; done: number }> = ({ rows, done }) 
       )}
     </div>
   </div>
-);
+  );
+};
 
 export const ShoppingPage: FC<{ rows: ShoppingRow[]; todo: number; done: number }> = ({ rows, todo, done }) => (
   <div class="mx-auto flex w-full flex-1 flex-col lg:max-w-3xl">
@@ -92,25 +118,29 @@ export const ShoppingPage: FC<{ rows: ShoppingRow[]; todo: number; done: number 
       </span>
     </div>
 
+    {/* dopo l'invio si svuota solo il nome: la categoria resta, di solito se ne aggiunge una serie */}
     <form
-      class="flex gap-2 px-4 pb-3 lg:px-0"
+      class="px-4 pb-3 lg:px-0"
       hx-post="/spesa"
       hx-target="#shop-list"
       hx-swap="outerHTML"
-      hx-on--after-request="this.reset(); this.querySelector('input').focus()"
+      hx-on--after-request="var n=this.querySelector('input[name=name]'); n.value=''; n.focus()"
     >
-      <input
-        class="field h-12 flex-1"
-        type="text"
-        name="name"
-        placeholder="Aggiungi alla lista…"
-        autocomplete="off"
-        enterkeyhint="done"
-        required
-      />
-      <button class="h-12 w-12 flex-none rounded-md bg-olive font-display text-[26px] font-medium text-paper dark:bg-olive-light dark:text-dark-bg">
-        +
-      </button>
+      <div class="flex gap-2">
+        <input
+          class="field h-12 flex-1"
+          type="text"
+          name="name"
+          placeholder="Aggiungi alla lista…"
+          autocomplete="off"
+          enterkeyhint="done"
+          required
+        />
+        <button class="h-12 w-12 flex-none rounded-md bg-olive font-display text-[26px] font-medium text-paper dark:bg-olive-light dark:text-dark-bg">
+          +
+        </button>
+      </div>
+      <CategorySelect className="mt-2" />
     </form>
 
     <List rows={rows} done={done} />

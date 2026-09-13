@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app.js';
 import { parseLine } from '../lib/parse.js';
 import { add, confirmLoad, counts, listOpen, pendingLoad, remove, toggleCheck } from '../lib/shopping.js';
+import { validCategory } from '../lib/types.js';
 import { Shell } from '../views/layout.js';
 import { List, LoadPage, ShoppingPage } from '../views/shopping.js';
 
@@ -24,9 +25,10 @@ shoppingRoutes.get('/', (c) => {
 shoppingRoutes.post('/', async (c) => {
   const form = await c.req.formData();
   const raw = String(form.get('name') ?? '').trim().slice(0, 120);
+  const category = validCategory(String(form.get('category') ?? ''));
   // cosi "burro x2" e "Latte 500 ml" funzionano scrivendoli di getto nel campo
   const parsed = raw ? parseLine(raw) : null;
-  if (parsed) add(parsed.name, parsed.qty, c.get('user').id, 'manual', parsed.size);
+  if (parsed) add(parsed.name, parsed.qty, c.get('user').id, 'manual', { measure: parsed.measure, category });
   return c.html(listFragment());
 });
 

@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { addDays, todayISO, weekStart } from './dates.js';
 import { addStock, inventoryAsText, setQty } from './inventory.js';
 import { mealsAsText, setMeal } from './meals.js';
+import { parseMeasure } from './measure.js';
 import { parseLine, stripBullet, stripWhatsApp } from './parse.js';
 import { findOrCreateProduct, findProduct, norm, productKey, productLabel, titleCase, validLocation } from './products.js';
 import { add as shopAdd, shoppingAsText } from './shopping.js';
@@ -25,6 +26,9 @@ Se mi proponi modifiche, scrivile in questo formato cosi le reincollo nella mia 
 
 Il peso e il formato della confezione, non la quantita: "Riso basmati 1150 g" e
 una busta da 1150 grammi. Per averne due si scrive "Riso basmati 1150 g x2".
+
+Fra parentesi quadre c'e la categoria dell'articolo: leggila pure, ma quando
+rimandi le righe puoi ometterla.
 `;
 
 export function buildContext(mondayISO = weekStart(todayISO())): string {
@@ -222,7 +226,9 @@ export function applyActions(actions: Action[], userId: number): number {
     let n = 0;
     for (const a of actions) {
       if (a.kind === 'inv') {
-        const product = a.productId ? { id: a.productId } : findOrCreateProduct(a.name, { size: a.size, location: a.location });
+        const product = a.productId
+          ? { id: a.productId }
+          : findOrCreateProduct(a.name, { measure: parseMeasure(a.size), location: a.location });
         const existing = db
           .prepare('select id from inventory where product_id = ? and location = ?')
           .get(product.id, a.location) as { id: number } | undefined;
@@ -237,7 +243,7 @@ export function applyActions(actions: Action[], userId: number): number {
         if (a.expiresOn) db.prepare('update inventory set expires_on = ? where id = ?').run(a.expiresOn, invId);
         n++;
       } else if (a.kind === 'shop') {
-        shopAdd(a.name, a.qty, userId, 'llm', a.size);
+        shopAdd(a.name, a.qty, userId, 'llm', { measure: parseMeasure(a.size) });
         n++;
       } else {
         setMeal(a.date, a.slot, a.body, userId);

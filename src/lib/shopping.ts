@@ -1,11 +1,12 @@
 import { db, logActivity } from '../db/index.js';
 import { addStock } from './inventory.js';
+import type { Measure } from './measure.js';
 import { findOrCreateProduct } from './products.js';
-import type { ShoppingRow } from './types.js';
+import { categoryRank, type ShoppingRow } from './types.js';
 
 const SELECT = `
   select s.id, s.product_id,
-         coalesce(p.name, s.free_text) as name, p.size,
+         coalesce(p.name, s.free_text) as name, p.size, p.category,
          s.qty, s.note, s.source, s.added_by,
          u.display_name as added_name, u.color as added_color,
          s.checked_at,
@@ -14,11 +15,17 @@ const SELECT = `
   left join products p on p.id = s.product_id
   left join users u on u.id = s.added_by`;
 
-/** Da prendere prima, spuntati in fondo. */
+/**
+ * Da prendere prima, spuntati in fondo. Dentro, l'ordine e quello delle
+ * categorie: cosi scorrere la lista e fare il giro delle corsie.
+ */
 export function listOpen(): ShoppingRow[] {
-  return db
+  const rows = db
     .prepare(`${SELECT} where s.loaded_at is null order by (s.checked_at is not null), s.created_at`)
     .all() as ShoppingRow[];
+  return rows.sort(
+    (a, b) => Number(!!a.checked_at) - Number(!!b.checked_at) || categoryRank(a.category) - categoryRank(b.category),
+  );
 }
 
 export function listChecked(): ShoppingRow[] {
@@ -48,11 +55,11 @@ export function add(
   qty: number,
   userId: number,
   source: 'manual' | 'llm' = 'manual',
-  size: string | null = null,
+  opts: { measure?: Measure | null; category?: string | null } = {},
 ): ShoppingRow | null {
   const name = rawName.trim();
   if (!name) return null;
-  const product = findOrCreateProduct(name, { size });
+  const product = findOrCreateProduct(name, { measure: opts.measure, category: opts.category });
   const existing = db
     .prepare('select id, qty from shopping_items where product_id = ? and loaded_at is null and checked_at is null')
     .get(product.id) as { id: number; qty: number } | undefined;

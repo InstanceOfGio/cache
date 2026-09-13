@@ -153,6 +153,82 @@ DISH=$(G "$BASE/pasti/suggerimenti?body=ris")
 contains "autocomplete piatti" "Risotto ai funghi" "$DISH"
 check "data non valida rifiutata"  400 "$(CODE "$BASE/pasti/cella?d=pippo&slot=cena")"
 
+# --- misura e quantita ---------------------------------------------------
+# Due numeri distinti su ogni articolo: quanto pesa la confezione, e quante ce
+# ne sono. Togliere l'uno non deve toccare l'altro.
+M1=$(G -X POST "$BASE/inventario/aggiungi" -d 'q=Yogurt greco' -d 'qty=2' -d 'location=Frigo' \
+     -d 'measure_value=150' -d 'measure_unit=g' --data-urlencode 'category=Latticini e uova')
+contains "aggiunta con misura dai campi" "Aggiunto: Yogurt greco 150 g" "$M1"
+INVM=$(G "$BASE/")
+contains "in lista: la misura"    "150 g" "$INVM"
+contains "in lista: la quantita"  'tnum">2<' "$INVM"
+
+IDY=$(printf '%s' "$INVM" | sed 's/Yogurt greco.*//' | grep -o 'inv-[0-9]*' | tail -1 | grep -o '[0-9]*')
+DET=$(G "$BASE/inventario/$IDY/dettagli")
+contains "dettagli: campo quantita"  'name="qty"' "$DET"
+contains "dettagli: campo misura"    'name="measure_value"' "$DET"
+contains "dettagli: campo unita"     'name="measure_unit"' "$DET"
+contains "dettagli: campo categoria" 'name="category"' "$DET"
+contains "dettagli: la misura arriva compilata" 'value="150"' "$DET"
+
+G -X POST "$BASE/inventario/$IDY/dettagli" -d 'qty=3' -d 'measure_value=500' -d 'measure_unit=ml' \
+  -d 'category=Bevande' -d 'min_qty=' -d 'expires_on=' -d 'location=Frigo' > /dev/null
+INVM2=$(G "$BASE/")
+contains "la misura cambiata si vede"    "500 ml" "$INVM2"
+contains "la quantita cambiata si vede"  'tnum">3<' "$INVM2"
+
+# svuotare il numero e il modo di togliere la misura: la quantita resta
+G -X POST "$BASE/inventario/$IDY/dettagli" -d 'qty=3' -d 'measure_value=' -d 'measure_unit=ml' \
+  -d 'category=Bevande' -d 'min_qty=' -d 'expires_on=' -d 'location=Frigo' > /dev/null
+INVM3=$(G "$BASE/")
+if printf '%s' "$INVM3" | grep -qF "500 ml"; then
+  say "svuotare il campo toglie la misura" "FALLITO"; ko=$((ko+1))
+else say "svuotare il campo toglie la misura" "ok"; ok=$((ok+1)); fi
+contains "e l'articolo resta"        "Yogurt greco" "$INVM3"
+contains "con la sua quantita"       'tnum">3<' "$INVM3"
+
+# Portare una misura sopra un prodotto che esiste gia: l'unicita del catalogo
+# farebbe fallire l'update, quindi le due schede vanno fuse.
+G -X POST "$BASE/inventario/aggiungi" -d 'q=Tonno' -d 'qty=2' -d 'location=Dispensa' \
+  -d 'measure_value=80' -d 'measure_unit=g' > /dev/null
+G -X POST "$BASE/inventario/aggiungi" -d 'q=Tonno' -d 'qty=3' -d 'location=Dispensa' \
+  -d 'measure_value=52' -d 'measure_unit=g' > /dev/null
+IDT=$(printf '%s' "$(G "$BASE/")" | sed 's/52 g.*//' | grep -o 'inv-[0-9]*' | tail -1 | grep -o '[0-9]*')
+G -X POST "$BASE/inventario/$IDT/dettagli" -d 'qty=3' -d 'measure_value=80' -d 'measure_unit=g' \
+  -d 'category=' -d 'min_qty=' -d 'expires_on=' -d 'location=Dispensa' > /dev/null
+check "l'app regge la fusione di due misure uguali" 200 "$(CODE "$BASE/")"
+INVT=$(G "$BASE/")
+if printf '%s' "$INVT" | grep -qF "52 g"; then
+  say "la scheda vecchia sparisce" "FALLITO"; ko=$((ko+1))
+else say "la scheda vecchia sparisce" "ok"; ok=$((ok+1)); fi
+contains "le quantita si sommano" 'tnum">5<' "$INVT"
+
+# --- categorie -----------------------------------------------------------
+CAT=$(G "$BASE/?grp=cat")
+contains "raggruppa per categoria" 'class="band sticky top-0 z-10"><span>Bevande</span>' "$CAT"
+contains "il bottone dice come e raggruppato" 'Raggruppato per categoria' "$CAT"
+contains "la scelta resta senza rimetterla nell'indirizzo" '<span>Bevande</span>' "$(G "$BASE/")"
+LOC=$(G "$BASE/?grp=loc")
+contains "si torna alle posizioni" 'class="band sticky top-0 z-10"><span>Dispensa</span>' "$LOC"
+contains "e anche questa resta"    'class="band sticky top-0 z-10"><span>Dispensa</span>' "$(G "$BASE/")"
+contains "il frammento sa come raggruppare" 'name="grp"' "$LOC"
+
+# --- lista spesa in ordine di corsia --------------------------------------
+contains "la lista spesa chiede la categoria" 'name="category"' "$(G "$BASE/spesa")"
+G -X POST "$BASE/spesa" -d 'name=Mele' --data-urlencode 'category=Frutta e verdura' > /dev/null
+G -X POST "$BASE/spesa" -d 'name=Detersivo piatti' --data-urlencode 'category=Casa e pulizia' > /dev/null
+SHOPC=$(G "$BASE/spesa")
+contains "lista spesa: fascia di categoria" 'class="band"><span>Frutta e verdura</span>' "$SHOPC"
+# ogni nome compare due volte (aria-label e riga): teniamo la prima occorrenza
+ORD=$(printf '%s' "$SHOPC" | grep -o 'Mele\|Detersivo piatti' | awk '!seen[$0]++' | tr '\n' ' ')
+check "la lista segue l'ordine delle corsie" "Mele Detersivo piatti " "$ORD"
+
+# --- barra laterale ------------------------------------------------------
+# Chi sei sta in fondo alla colonna: senza `sticky` su un inventario lungo
+# finisce fuori schermo. Questo non si vede da HTTP, ma la classe si.
+contains "la colonna resta ancorata allo schermo" 'lg:sticky lg:top-0' "$(G "$BASE/")"
+contains "e nell'inventario c'e il link al tuo profilo" 'href="/admin"' "$(G "$BASE/")"
+
 # --- privacy fra utenti --------------------------------------------------
 # la password generata compare una volta sola, nella pagina che l'ha creata
 PWD2=$(printf '%s' "$NEW" | tr '<' '\n' | grep -A0 'code id="new-pwd"' | sed 's/.*>//' | tr -d ' \n')
