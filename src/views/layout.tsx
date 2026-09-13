@@ -11,22 +11,35 @@ const TABS: { key: Tab; href: string; label: string }[] = [
   { key: 'pasti', href: '/pasti', label: 'Pasti' },
 ];
 
-/** Il barattolo con l'etichetta: logo dell'app. */
-export const Jar: FC<{ size?: number; className?: string }> = ({ size = 32, className = '' }) => (
+/**
+ * Il tappo del vasetto visto dall'alto: logo dell'app (proposta 2f del design,
+ * con il cerchio in oliva invece che in inchiostro). Le proporzioni vengono
+ * dalla scheda a 120px: tappo 88/120, ghiera a 7px dal bordo, C a 54px.
+ */
+export const Logo: FC<{ size?: number; className?: string }> = ({ size = 32, className = '' }) => (
   <span
-    class={`relative grid flex-none place-items-center overflow-hidden bg-olive dark:bg-olive-light ${className}`}
-    style={`width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.22)}px`}
+    class={`grid flex-none place-items-center bg-paper-band dark:bg-dark-band ${className}`}
+    style={`width:${size}px;height:${size}px;border-radius:${(size * 0.225).toFixed(1)}px`}
     aria-hidden="true"
   >
     <span
-      class="absolute bg-paper dark:bg-dark-bg"
-      style={`inset:auto ${size * 0.12}px ${size * 0.12}px ${size * 0.12}px;height:${size * 0.31}px;border-radius:${Math.max(2, size * 0.04)}px`}
-    />
-    <span
-      class="relative font-display font-extrabold leading-none text-paper dark:text-dark-bg"
-      style={`font-size:${size * 0.74}px;margin-top:-${size * 0.24}px;letter-spacing:-.04em`}
+      class="relative grid place-items-center rounded-full bg-olive dark:bg-olive-light"
+      style={`width:${(size * 0.733).toFixed(1)}px;height:${(size * 0.733).toFixed(1)}px`}
     >
-      C
+      {/* la ghiera: sotto una certa taglia resterebbe una sbavatura, come nella
+          scheda del design che a 28px la lascia fuori */}
+      {size >= 44 ? (
+        <span
+          class="absolute rounded-full border-paper/35 dark:border-dark-bg/35"
+          style={`inset:${(size * 0.058).toFixed(1)}px;border-width:${Math.max(1, size * 0.017).toFixed(1)}px`}
+        />
+      ) : null}
+      <span
+        class="relative font-display font-extrabold leading-none text-paper dark:text-dark-bg"
+        style={`font-size:${(size * 0.45).toFixed(1)}px;letter-spacing:-.05em`}
+      >
+        C
+      </span>
     </span>
   </span>
 );
@@ -92,7 +105,7 @@ export const Shell: FC<PropsWithChildren<ShellProps>> = ({ title, user, tab, bar
 const Sidebar: FC<{ user: User | null; tab?: Tab }> = ({ user, tab }) => (
   <aside class="hidden w-[200px] flex-none flex-col gap-1.5 bg-paper-band px-5 py-7 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:overflow-y-auto dark:bg-dark-band">
     <a href="/" class="mb-7 flex items-center gap-2.5">
-      <Jar size={32} />
+      <Logo size={32} />
       <span class="font-display text-[22px] font-extrabold tracking-[-.02em]">Cache</span>
     </a>
     {TABS.map((t) => (

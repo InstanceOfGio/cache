@@ -1,10 +1,10 @@
 import type { FC } from 'hono/jsx';
-import { Jar } from './layout.js';
+import { Logo } from './layout.js';
 
 export const LoginPage: FC<{ email?: string; error?: string | null }> = ({ email = '', error }) => (
   <div class="flex min-h-[100dvh] flex-col justify-end px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:justify-center">
     <div class="mx-auto w-full max-w-sm">
-      <Jar size={72} className="mb-5" />
+      <Logo size={72} className="mb-5" />
       <h1 class="font-display text-[44px] font-extrabold leading-none tracking-[-.02em]">Cache</h1>
       <p class="mb-9 mt-2 font-body text-row text-ink-60 dark:text-dark-muted">La dispensa di casa, sempre in tasca.</p>
 
