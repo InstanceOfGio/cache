@@ -16,7 +16,8 @@
     "build:js": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/server.js --external:better-sqlite3 --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "build:vendor": "node scripts/vendor.mjs",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:parse": "tsx scripts/test-parse.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

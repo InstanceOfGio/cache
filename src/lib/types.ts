@@ -18,6 +18,7 @@ export interface InventoryRow {
   id: number;
   product_id: number;
   name: string;
+  size: string | null;
   unit: string | null;
   location: string;
   qty: number;
@@ -30,6 +31,7 @@ export interface ShoppingRow {
   id: number;
   product_id: number | null;
   name: string;
+  size: string | null;
   qty: number;
   note: string | null;
   source: 'manual' | 'threshold' | 'llm';

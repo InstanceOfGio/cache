@@ -21,7 +21,7 @@ export function badgeFor(row: InventoryRow): Badge | null {
 }
 
 const SELECT = `
-  select i.id, i.product_id, p.name, p.unit, i.location, i.qty, i.min_qty, i.expires_on, i.zeroed_at
+  select i.id, i.product_id, p.name, p.size, p.unit, i.location, i.qty, i.min_qty, i.expires_on, i.zeroed_at
   from inventory i join products p on p.id = i.product_id`;
 
 const VISIBLE = `(i.qty > 0 or (i.zeroed_at is not null and julianday('now') - julianday(i.zeroed_at) < ${ZERO_GRACE_DAYS}))`;
@@ -174,7 +174,7 @@ export function inventoryAsText(): string {
   for (const [loc, items] of byLoc) {
     out.push(`# ${loc.toUpperCase()}`);
     for (const it of items) {
-      const bits = [`${it.name} x${qtyText(it.qty)}`];
+      const bits = [`${it.name}${it.size ? ` ${it.size}` : ''} x${qtyText(it.qty)}`];
       if (it.expires_on) bits.push(`(scade ${it.expires_on})`);
       if (it.min_qty != null && it.qty < it.min_qty) bits.push('(sotto soglia)');
       out.push(`- ${bits.join(' ')}`);

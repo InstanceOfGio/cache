@@ -27,6 +27,9 @@ export const Row: FC<{ row: ShoppingRow }> = ({ row }) => {
 
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <span class={`truncate font-body text-row ${done ? 'line-through' : ''}`}>{row.name}</span>
+        {row.size ? (
+          <span class="flex-none font-body text-sm text-ink-50 dark:text-dark-muted">{row.size}</span>
+        ) : null}
         {row.source === 'threshold' ? <span class="badge badge-auto">Auto · soglia</span> : null}
       </div>
 
@@ -130,7 +133,10 @@ export const LoadPage: FC<{ lines: LoadLine[] }> = ({ lines }) => (
         {lines.map((l) => (
           <div class="flex h-[60px] items-center gap-1.5 border-b border-dashed border-ink-18 pl-4 pr-2 dark:border-dark-line">
             <div class="min-w-0 flex-1">
-              <div class="truncate font-body text-row">{l.name}</div>
+              <div class="truncate font-body text-row">
+                {l.name}
+                {l.size ? <span class="ml-1.5 text-sm text-ink-50 dark:text-dark-muted">{l.size}</span> : null}
+              </div>
               <div class="font-display text-xs font-semibold uppercase tracking-wider text-ink-50 dark:text-dark-muted">
                 {l.location} · da {qtyLabel(l.from)} a{' '}
                 <span data-total={`t-${l.id}`}>{qtyLabel(l.from + l.qty)}</span>

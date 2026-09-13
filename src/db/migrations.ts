@@ -123,4 +123,13 @@ create index activity_at_idx on activity(at desc);
 create table settings (k text primary key, v text not null);
 `,
   },
+  {
+    name: '002_product_size',
+    sql: `
+-- Il formato della confezione: "230 g", "500 ml", "1 kg".
+-- Fa parte dell'identita del prodotto (ceci da 230 e da 400 sono due righe
+-- distinte in dispensa), quindi entra anche in products.norm.
+alter table products add column size text;
+`,
+  },
 ];

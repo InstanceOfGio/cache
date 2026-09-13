@@ -5,7 +5,7 @@ import type { ShoppingRow } from './types.js';
 
 const SELECT = `
   select s.id, s.product_id,
-         coalesce(p.name, s.free_text) as name,
+         coalesce(p.name, s.free_text) as name, p.size,
          s.qty, s.note, s.source, s.added_by,
          u.display_name as added_name, u.color as added_color,
          s.checked_at,
@@ -43,10 +43,16 @@ export function getRow(id: number): ShoppingRow | null {
 }
 
 /** Aggiunge alla lista. Se il nome corrisponde a una riga aperta, ne somma la quantita. */
-export function add(rawName: string, qty: number, userId: number, source: 'manual' | 'llm' = 'manual'): ShoppingRow | null {
+export function add(
+  rawName: string,
+  qty: number,
+  userId: number,
+  source: 'manual' | 'llm' = 'manual',
+  size: string | null = null,
+): ShoppingRow | null {
   const name = rawName.trim();
   if (!name) return null;
-  const product = findOrCreateProduct(name);
+  const product = findOrCreateProduct(name, size);
   const existing = db
     .prepare('select id, qty from shopping_items where product_id = ? and loaded_at is null and checked_at is null')
     .get(product.id) as { id: number; qty: number } | undefined;
@@ -87,6 +93,7 @@ export interface LoadLine {
   id: number;
   product_id: number | null;
   name: string;
+  size: string | null;
   qty: number;
   location: string;
   from: number;
@@ -96,7 +103,7 @@ export interface LoadLine {
 export function pendingLoad(): LoadLine[] {
   return db
     .prepare(
-      `select s.id, s.product_id, coalesce(p.name, s.free_text) as name, s.qty,
+      `select s.id, s.product_id, coalesce(p.name, s.free_text) as name, p.size, s.qty,
               coalesce(
                 (select i.location from inventory i where i.product_id = s.product_id order by i.qty desc, i.id limit 1),
                 p.default_location, 'Dispensa') as location,
@@ -130,5 +137,7 @@ export function confirmLoad(userId: number, overrides: Map<number, number>): num
 export function shoppingAsText(): string {
   const rows = listOpen().filter((r) => !r.checked_at);
   if (!rows.length) return '(lista vuota)';
-  return rows.map((r) => `- ${r.name}${r.qty > 1 ? ` x${r.qty}` : ''}`).join('\n');
+  return rows
+    .map((r) => `- ${r.name}${r.size ? ` ${r.size}` : ''}${r.qty > 1 ? ` x${r.qty}` : ''}`)
+    .join('\n');
 }

@@ -11,6 +11,14 @@ export function norm(s: string): string {
     .trim();
 }
 
+/**
+ * Identita di un prodotto: nome + formato. "Ceci 230 g" e "Ceci 400 g" sono
+ * due prodotti diversi, perche in dispensa sono due barattoli diversi.
+ */
+export function productKey(name: string, size?: string | null): string {
+  return norm(size ? `${name} ${size}` : name);
+}
+
 export function titleCase(s: string): string {
   const t = s.trim().replace(/\s+/g, ' ');
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -20,35 +28,42 @@ export function validLocation(s: string | undefined | null): string {
   return LOCATIONS.includes(s as (typeof LOCATIONS)[number]) ? s! : LOCATIONS[0];
 }
 
-export interface Product { id: number; name: string; unit: string | null; default_location: string }
+export interface Product {
+  id: number;
+  name: string;
+  size: string | null;
+  unit: string | null;
+  default_location: string;
+}
 
-/** Cerca un prodotto per nome o alias. Non crea nulla. */
-export function findProduct(name: string): Product | null {
-  const n = norm(name);
-  if (!n) return null;
-  const direct = db
-    .prepare<[string], Product>('select id, name, unit, default_location from products where norm = ?')
-    .get(n);
+const COLS = 'id, name, size, unit, default_location';
+
+/** Cerca un prodotto per nome+formato o per alias. Non crea nulla. */
+export function findProduct(name: string, size?: string | null): Product | null {
+  const key = productKey(name, size);
+  if (!key) return null;
+  const direct = db.prepare(`select ${COLS} from products where norm = ?`).get(key) as Product | undefined;
   if (direct) return direct;
   return (
-    db
-      .prepare<[string], Product>(
-        `select p.id, p.name, p.unit, p.default_location from product_aliases a
+    (db
+      .prepare(
+        `select p.${COLS.split(', ').join(', p.')} from product_aliases a
          join products p on p.id = a.product_id where a.alias_norm = ?`,
       )
-      .get(n) ?? null
+      .get(key) as Product | undefined) ?? null
   );
 }
 
 /** Trova il prodotto o lo crea nel catalogo. */
-export function findOrCreateProduct(name: string, location?: string): Product {
-  const existing = findProduct(name);
+export function findOrCreateProduct(name: string, size?: string | null, location?: string): Product {
+  const existing = findProduct(name, size);
   if (existing) return existing;
   const clean = titleCase(name);
+  const loc = validLocation(location);
   const info = db
-    .prepare('insert into products (name, norm, default_location) values (?, ?, ?)')
-    .run(clean, norm(clean), validLocation(location));
-  return { id: Number(info.lastInsertRowid), name: clean, unit: null, default_location: validLocation(location) };
+    .prepare('insert into products (name, size, norm, default_location) values (?, ?, ?, ?)')
+    .run(clean, size ?? null, productKey(clean, size), loc);
+  return { id: Number(info.lastInsertRowid), name: clean, size: size ?? null, unit: null, default_location: loc };
 }
 
 export function addAlias(productId: number, alias: string) {
@@ -57,17 +72,28 @@ export function addAlias(productId: number, alias: string) {
   db.prepare('insert or ignore into product_aliases (alias_norm, product_id) values (?, ?)').run(n, productId);
 }
 
+/** Etichetta completa: "Ceci 230 g". */
+export const productLabel = (p: { name: string; size?: string | null }) => (p.size ? `${p.name} ${p.size}` : p.name);
+
 /** Suggerimenti per l'autocomplete: prefisso prima, poi contenuto. */
-export interface Suggestion { id: number; name: string; location: string; qty: number }
+export interface Suggestion {
+  id: number;
+  name: string;
+  size: string | null;
+  location: string;
+  qty: number;
+}
+
 export function suggestProducts(q: string, limit = 6): Suggestion[] {
   const n = norm(q);
   if (!n) return [];
-  const pref = `${n}%`, any = `%${n}%`;
+  const pref = `${n}%`,
+    any = `%${n}%`;
   // Solo segnaposto `?` anonimi: con `?1`/`?2` better-sqlite3 li considera
   // parametri nominati e rifiuta gli argomenti posizionali.
   return db
     .prepare(
-      `select p.id, p.name,
+      `select p.id, p.name, p.size,
               coalesce(inv.location, p.default_location) as location,
               coalesce(inv.qty, 0) as qty
        from products p

@@ -19,6 +19,9 @@ export const Row: FC<{ row: InventoryRow }> = ({ row }) => {
         hx-swap="innerHTML"
       >
         <span class={`row-name ${zeroed ? 'text-cenere line-through' : ''}`}>{row.name}</span>
+        {row.size ? (
+          <span class="flex-none font-body text-sm text-ink-50 dark:text-dark-muted">{row.size}</span>
+        ) : null}
         {badge && !zeroed ? <span class={`badge badge-${badge.kind}`}>{badge.text}</span> : null}
       </button>
 
@@ -310,6 +313,7 @@ export const Suggestions: FC<{ q: string; suggestions: Suggestion[] }> = ({ q, s
         >
           <span class="truncate font-body text-row">
             <Highlight text={s.name} term={term} />
+            {s.size ? <span class="ml-1.5 text-sm text-ink-50 dark:text-dark-muted">{s.size}</span> : null}
           </span>
           <span class="flex-none font-display text-xs font-semibold uppercase tracking-wider text-ink-50 dark:text-dark-muted">
             {s.location} · ne hai {qtyLabel(s.qty)}

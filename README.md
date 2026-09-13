@@ -66,26 +66,39 @@ riga per riga e applica solo quello che spunti.
 
 ### Il formato dell'import
 
-Vale sia per la lista dalle note sia per la risposta di un LLM:
+Il parser (`src/lib/parse.ts`) è tarato su una lista della dispensa buttata giù su WhatsApp, dove
+**i numeri sono quasi sempre pesi, non quantità**: `Riso basmati 1150 gr` è una busta da 1150 grammi,
+non 1150 buste. Il peso diventa il *formato* della confezione e fa parte dell'identità del prodotto:
+`Ceci 230 g` e `Ceci 400 g` sono due righe distinte in dispensa, perché sono due barattoli diversi.
 
 ```
-# DISPENSA                 → cambia posizione per le righe che seguono
-Pasta penne x2             → quantità 2
-Passata di pomodoro: 6     → quantità 6
-Farina: +1                 → aggiunge 1 a quella che hai
-Yogurt -> Frigo            → posizione esplicita su una riga sola
-Caffe macinato             → quantità 1
-
-# LISTA SPESA
-pane
-burro x2
-
-# PASTI
-Lunedi cena: risotto ai funghi
+[15:19, 9/13/2026] F.: 4 x ceci 230gr     → Ceci · 230 g · x4   (prefisso WhatsApp tolto)
+Frigo                                     → una posizione da sola sposta le righe seguenti
+Riso basmati 1150 gr                      → Riso basmati · 1150 g · x1
+Fagioli borlotti 115gr x2                 → x2
+Zafferano 3 buste                         → x3, "buste" esce dal nome
+Crescenza 170 gr scade 17 settembre       → scadenza 2026-09-17
+Olive toscane 290gr sgocc 140gr           → "sgocc" e il peso sgocciolato non entrano nel nome
+Farina 00 1kg                             → "00" resta nel nome, non è una quantità
+Lurpak burro 200                          → x1: 200 panetti di burro non stanno in frigo
+Farina: +2                                → somma 2 a quello che c'è già
+Yogurt -> Frigo                           → posizione esplicita su una riga sola
 ```
 
-Una riga che non rispetta niente di tutto questo entra comunque come quantità 1. Niente viene scritto
-senza passare dall'anteprima.
+Se lo stesso prodotto compare più volte nella stessa lista, dalla seconda volta in poi **si somma**:
+`Tonno 52gr` e più sotto `Tonno 52gr x3` fanno 4, non 3. Senza questa regola l'ultima riga
+cancellerebbe le precedenti.
+
+Le sezioni si cambiano con `# DISPENSA`, `# LISTA SPESA`, `# PASTI` (o con una posizione da sola su
+una riga). Una riga che non rispetta niente di tutto questo entra comunque come quantità 1, e niente
+viene scritto senza passare dall'anteprima.
+
+Per tarare il parser su una lista vera senza scrivere nulla:
+
+```bash
+DATABASE_PATH=/tmp/prova.sqlite npx tsx scripts/dry-run-import.ts lista.txt
+npm run test:parse    # 26 casi presi dalla lista vera
+```
 
 ## Deploy su Fly
 
@@ -141,6 +154,8 @@ src/
   styles.css          i @keyframes vanno qui: Tailwind emette solo quelli usati da animate-*
 scripts/
   vendor.mjs          copia htmx, disegna le icone PWA, scrive il manifest
+  test-parse.ts       casi veri per il parser (npm run test:parse)
+  dry-run-import.ts   mostra come verrebbe letto un file, senza scrivere niente
   smoke.sh            il giro completo su un'istanza avviata
 ```
 

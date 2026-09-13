@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../app.js';
+import { parseLine } from '../lib/parse.js';
 import { add, confirmLoad, counts, listOpen, pendingLoad, remove, toggleCheck } from '../lib/shopping.js';
 import { Shell } from '../views/layout.js';
 import { List, LoadPage, ShoppingPage } from '../views/shopping.js';
@@ -22,9 +23,10 @@ shoppingRoutes.get('/', (c) => {
 
 shoppingRoutes.post('/', async (c) => {
   const form = await c.req.formData();
-  const name = String(form.get('name') ?? '').trim().slice(0, 120);
-  const qty = Math.max(1, Number(form.get('qty') ?? 1) || 1);
-  if (name) add(name, qty, c.get('user').id);
+  const raw = String(form.get('name') ?? '').trim().slice(0, 120);
+  // cosi "burro x2" e "Latte 500 ml" funzionano scrivendoli di getto nel campo
+  const parsed = raw ? parseLine(raw) : null;
+  if (parsed) add(parsed.name, parsed.qty, c.get('user').id, 'manual', parsed.size);
   return c.html(listFragment());
 });
 
