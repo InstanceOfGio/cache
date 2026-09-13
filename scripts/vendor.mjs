@@ -1,5 +1,5 @@
 /* Copia htmx in static/ e genera le icone PWA. Nessuna dipendenza esterna. */
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { deflateSync } from 'node:zlib';
 import { dirname, join } from 'node:path';
@@ -12,8 +12,16 @@ mkdirSync(iconsDir, { recursive: true });
 
 /* ------------------------------------------------------------------ htmx */
 
+// htmx.org e una devDependency: dopo `npm prune --omit=dev` non c'e piu.
+// Se il file e gia stato copiato va bene cosi, altrimenti e un errore vero.
 const require = createRequire(import.meta.url);
-copyFileSync(require.resolve('htmx.org/dist/htmx.min.js'), join(staticDir, 'htmx.min.js'));
+const htmxDest = join(staticDir, 'htmx.min.js');
+try {
+  copyFileSync(require.resolve('htmx.org/dist/htmx.min.js'), htmxDest);
+} catch (err) {
+  if (!existsSync(htmxDest)) throw err;
+  console.log('[vendor] htmx.org non installato, tengo la copia gia presente');
+}
 
 /* ------------------------------------------------------------------ icone */
 
